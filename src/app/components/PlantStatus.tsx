@@ -13,7 +13,7 @@ interface StatusIndicator {
   value: 'good' | 'warning' | 'critical';
 }
 
-export function PlantStatus() {
+export function StatusView() {
   const [searchParams] = useSearchParams();
   const plantName = searchParams.get('plant') || '바질';
   const [showCamera, setShowCamera] = useState(false);
