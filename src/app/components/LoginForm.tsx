@@ -1,5 +1,7 @@
+import axios from 'axios';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
+import api from '../api/axios';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -16,14 +18,33 @@ export function LoginForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     // 로그인 로직 시뮬레이션
-    setTimeout(() => {
-      console.log('로그인 시도:', { email, password });
-      setIsLoading(false);
-      // 로그인 성공 후 기기 등록 화면으로 이동
+    // setTimeout(() => {
+    //   console.log('로그인 시도:', { email, password });
+    //   setIsLoading(false);
+    //   // 로그인 성공 후 기기 등록 화면으로 이동
+    //   navigate('/device-registration');
+    // }, 1500);
+
+
+    try {
+      // 이제 'api' 인스턴스를 사용합니다.
+      const response = await api.post('/auth/login', {
+        email,
+        password,
+      });
+
+      const { accessToken, refreshToken } = response.data;
+      localStorage.setItem('accessToken', accessToken);
+      localStorage.setItem('refreshToken', refreshToken);
+
       navigate('/device-registration');
-    }, 1500);
+    } catch (error) {
+      console.error('로그인 에러:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -113,7 +134,8 @@ export function LoginForm() {
           <button
             type="button"
             className="text-primary hover:underline"
-            onClick={() => console.log('회원가입')}
+            //onClick={() => console.log('회원가입')}
+            onClick={() => navigate('/register')} // 회원가입 경로로 이동
           >
             회원가입
           </button>
