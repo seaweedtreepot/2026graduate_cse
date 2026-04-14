@@ -39,7 +39,7 @@ export function LoginForm() {
       localStorage.setItem('accessToken', accessToken);
       localStorage.setItem('refreshToken', refreshToken);
 
-      navigate('/device-registration');
+      navigate('/plantList'); // 로그인 성공 후 식물 목록 화면으로 이동
     } catch (error) {
       console.error('로그인 에러:', error);
     } finally {
@@ -145,7 +145,7 @@ export function LoginForm() {
           <button
             type="button"
             className="text-primary hover:underline"
-            onClick={() => navigate('/device-registration')}
+            onClick={() => navigate('/plantList')}
           >
             기기 등록 화면 보기
           </button>

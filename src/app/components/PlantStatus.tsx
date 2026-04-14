@@ -6,6 +6,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from './ui/button';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { motion, useMotionValue, useSpring } from 'motion/react';
+import api from '../api/axios';
+
 
 interface StatusIndicator {
   icon: React.ElementType;
@@ -13,8 +15,27 @@ interface StatusIndicator {
   value: 'good' | 'warning' | 'critical';
 }
 
-export function StatusView() {
+
+const LEVEL_NAMES: Record<number, string> = {
+  1: '씨앗',
+  2: '새싹',
+  3: '성장',
+  4: '개화',
+  5: '결실',
+};
+
+const LEVEL_TO_PROGRESS: Record<number, number> = {
+  1: 5, 2: 25, 3: 55, 4: 85, 5: 100,
+};
+
+interface StatusViewProps {
+  setError: (val: boolean) => void;
+}
+
+export function StatusView({ setError }: StatusViewProps) {
   const [searchParams] = useSearchParams();
+
+  const plantId = searchParams.get('id');
   const plantName = searchParams.get('plant') || '바질';
   const [showCamera, setShowCamera] = useState(false);
   const [selectedAction, setSelectedAction] = useState<string | null>(null);
@@ -24,10 +45,31 @@ export function StatusView() {
   const [isWatering, setIsWatering] = useState(false);
   const [wateringComplete, setWateringComplete] = useState(false);
   const [recentlySolved, setRecentlySolved] = useState<string | null>(null);
+  const [streamUrl, setStreamUrl] = useState<string>(''); // 스트리밍 주소 저장
+  const [isCapturing, setIsCapturing] = useState(false); // 캡처 로딩 상태
+  const [lastUpdated, setLastUpdated] = useState<string>(''); // 마지막 동기화 시간
 
-  const [growthProgress, setGrowthProgress] = useState(65); // 예시로 65% 설정
-  const plantedDate = new Date('2026-02-20'); // 심은 날짜
-  const daysSincePlanted = Math.floor((new Date().getTime() - plantedDate.getTime()) / (1000 * 60 * 60 * 24));
+
+  // 3. [추가] 서버의 숫자 데이터를 'good' 등으로 변환해주는 도구 (함수)
+  const determineStatus = (label: string, value: number): 'good' | 'warning' | 'critical' => {
+    if (label === '벌레' || label === '질병') return value > 0 ? 'critical' : 'good';
+    if (label === '습도') return value < 30 ? 'critical' : value < 60 ? 'warning' : 'good';
+    if (label === '온도') return (value < 15 || value > 30) ? 'critical' : 'good';
+    return 'good';
+  };
+
+  // 2. 기존 growthProgress 상태는 지우고 이걸 넣으세요
+  const [currentLevel, setCurrentLevel] = useState<number>(Number(searchParams.get('level')) || 1);
+  const growthProgress = LEVEL_TO_PROGRESS[currentLevel] || 5;
+
+  // 1. [수정] URL에서 심은 날짜를 가져옵니다. (없으면 오늘 날짜로 방어)
+  const plantedAtParam = searchParams.get('plantedAt') || new Date().toISOString().split('T')[0];
+  const plantedDate = new Date(plantedAtParam);
+
+  // 2. [수정] 현재 시간과의 차이를 계산합니다.
+  const daysSincePlanted = Math.floor(
+    (new Date().getTime() - plantedDate.getTime()) / (1000 * 60 * 60 * 24)
+  ) + 1; // 오늘 심었으면 1일째로 표시
   const growthStages = [
     { label: '씨앗', icon: '🌱', minProgress: 0 },
     { label: '새싹', icon: '🌿', minProgress: 20 },
@@ -36,6 +78,32 @@ export function StatusView() {
     { label: '결실', icon: '🍅', minProgress: 100 },
   ];
 
+  const fetchStatus = async () => {
+    try {
+      const res = await api.get(`/plants/${plantId}/sensors/latest`);
+      const data = res.data;
+
+      // 3. [여기 추가] 서버에서 준 level이 있다면 상태 업데이트
+      if (data.level) {
+        setCurrentLevel(data.level);
+      }
+
+      const updatedData: StatusIndicator[] = [
+        { icon: Droplets, label: '습도', value: determineStatus('습도', data.moisture) },
+        { icon: Sun, label: '조도', value: determineStatus('조도', data.light) },
+        { icon: Sprout, label: '흙의 상태', value: data.soilStatus > 20 ? 'good' : 'critical' },
+        { icon: Bug, label: '벌레', value: determineStatus('벌레', data.bug) },
+        { icon: Thermometer, label: '온도', value: determineStatus('온도', data.temperature) },
+        { icon: AlertTriangle, label: '질병', value: determineStatus('질병', data.disease) },
+      ];
+      setStatusData(updatedData);
+      setLastUpdated(new Date(data.timestamp).toLocaleTimeString('ko-KR'));
+      setError(false);
+    } catch (err) {
+      console.error("데이터 호출 실패:", err);
+      setError(true);
+    }
+  };
   // 마우스 위치 추적
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
@@ -66,6 +134,22 @@ export function StatusView() {
       window.removeEventListener('touchmove', handleTouchMove);
     };
   }, [mouseX, mouseY]);
+
+  useEffect(() => {
+    if (showCamera && plantId) {
+      const fetchStreamUrl = async () => {
+        try {
+          const res = await api.get(`/plants/${plantId}/cam/stream-url`);
+          setStreamUrl(res.data.streamUrl);
+        } catch (err) {
+          console.error("스트리밍 주소 로드 실패:", err);
+        }
+      };
+      fetchStreamUrl();
+    } else {
+      setStreamUrl('');
+    }
+  }, [showCamera, plantId]);
 
   // 실제로는 기기에서 받아온 데이터를 사용
   const [statusData, setStatusData] = useState<StatusIndicator[]>([
@@ -102,17 +186,14 @@ export function StatusView() {
   ]);
 
   // 시뮬레이션: 주기적으로 상태 업데이트
+  // PlantStatus.tsx 내부의 기존 useEffect를 아래로 교체
   useEffect(() => {
-    const interval = setInterval(() => {
-      setStatusData(prev => prev.map(status => ({
-        ...status,
-        // 랜덤하게 상태 변경 (실제로는 기기 데이터 사용)
-        value: 'critical',
-      })));
-    }, 120000); // 2분마다 업데이트
+    if (!plantId) return;
 
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 30000); // 30초 주기
     return () => clearInterval(interval);
-  }, []);
+  }, [plantId]);
 
   const getStatusColor = (value: 'good' | 'warning' | 'critical') => {
     switch (value) {
@@ -258,62 +339,102 @@ export function StatusView() {
 
   const backgroundStyle = getBackgroundStyle();
 
-  const handleActionClick = (actionType: string) => {
+  const handleActionClick = async (actionType: string) => {
+    if (!plantId) {
+      alert("식물 ID가 없어 제어할 수 없습니다.");
+      return;
+    }
+
     if (actionType === 'humidity') {
-      console.log('물주기 시작');
-      setIsWatering(true);
+      console.log('💧 물주기 명령 전송 시작');
+      setIsWatering(true); // 애니메이션 시작
       setSelectedAction(null);
 
-      // 3초 후 물주기 완료
-      setTimeout(() => {
+      try {
+        // 1. 실제 물주기 API 호출 (명세서 기준)
+        const response = await api.post(`/plants/${plantId}/control/water`, {
+          amount: 50 // 보낼 양 (서버와 협의된 값)
+        });
+
+        if (response.data.status === 'success' || response.status === 200) {
+          console.log('✅ 서버 응답:', response.data.message);
+
+          // 3초 후 애니메이션 종료 및 결과 반영 (기존 로직 유지)
+          setTimeout(() => {
+            setIsWatering(false);
+            setWateringComplete(true);
+            setRecentlySolved('humidity');
+
+            // 센서 상태를 강제로 'good'으로 업데이트 (서버에서 다시 읽어오기 전까지 UI 유지)
+            setStatusData(prev => prev.map(status =>
+              (status.label === '습도' || status.label === '흙의 상태')
+                ? { ...status, value: 'good' } : status
+            ));
+
+            setTimeout(() => {
+              setWateringComplete(false);
+              setRecentlySolved(null);
+            }, 3000);
+          }, 3000);
+        }
+      } catch (err) {
+        console.error('❌ 물주기 실패:', err);
+        alert('기기와 연결이 원활하지 않아 물을 줄 수 없습니다.');
         setIsWatering(false);
-        setWateringComplete(true);
-        setRecentlySolved('humidity');
-        console.log('물주기 완료! 기기에 신호 전송');
+      }
 
-        setStatusData(prev => prev.map(status => { // 습도와 흙의 상태를 'good'으로 업데이트 => 나중에 흙상태 센싱 처리 어케할지 생각해봐야할듯
-          if (status.label === '습도' || status.label === '흙의 상태') {
-            return {
-              ...status,
-              value: 'good'
-            };
-          }
-          return status;
-        }));
-        // 3초 후 완료 상태 해제
-        setTimeout(() => {
-          setWateringComplete(false);
-          setRecentlySolved(null);
-        }, 3000);
-      }, 3000);
     } else if (actionType === 'bug') {
-      console.log('바람불기 시작');
-      setSelectedAction(null); // 메뉴 닫기
-      setIsBlowing(true); // 바람 애니메이션(💨) 시작
+      console.log('💨 바람불기 명령 전송 시작');
+      setIsBlowing(true); // 바람 애니메이션 시작
+      setSelectedAction(null);
 
-      // 1.5초(바람 부는 시간) 후에 벌레가 실제로 사라지도록 설정
-      setTimeout(() => {
+      try {
+        // 2. 실제 바람 제어 API 호출 (명세서 기준)
+        const response = await api.post(`/plants/${plantId}/control/wind`, {
+          duration: 3000 // 바람 부는 시간 (ms)
+        });
+
+        if (response.data.status === 'success' || response.status === 200) {
+          console.log('✅ 서버 응답:', response.data.message);
+
+          // 1.5초 후 벌레 사라지는 연출
+          setTimeout(() => {
+            setIsBlowing(false);
+            setBugsBlownAway(true);
+            setRecentlySolved('bug');
+
+            setStatusData(prev => prev.map(status =>
+              status.label === '벌레' ? { ...status, value: 'good' } : status
+            ));
+
+            setTimeout(() => {
+              setRecentlySolved(null);
+              setBugsBlownAway(false);
+            }, 3000);
+          }, 1500);
+        }
+      } catch (err) {
+        console.error('❌ 바람불기 실패:', err);
+        alert('바람 제어 명령을 전달하지 못했습니다.');
         setIsBlowing(false);
-        setBugsBlownAway(true); // 벌레들이 화면 밖으로 날아감
-        setRecentlySolved('bug'); // 캐릭터가 기뻐하는 표정으로 변경
-        setBugsBlownAway(false); // 바람 애니메이션 종료 후 상태 초기화
-        // **핵심**: statusData에서 벌레 상태를 'good'으로 업데이트
-        setStatusData(prev => prev.map(status =>
-          status.label === '벌레'
-            ? { ...status, value: 'good', message: '벌레를 모두 쫓아냈습니다!' }
-            : status
-        ));
-
-        // 3초 후 캐릭터 표정을 평상시로 되돌림
-        setTimeout(() => {
-          setRecentlySolved(null);
-          // 필요하다면 다시 벌레가 나타날 수 있게 setBugsBlownAway(false)를 할 수 있지만, 
-          // 현재는 2분마다 전체가 critical로 바뀌게 설정하셨으니 그대로 두셔도 됩니다.
-        }, 3000);
-      }, 1500); // 1.5초 동안 바람 연출 후 결과 반영
+      }
     }
   };
 
+  const handleCapture = async () => {
+    if (!plantId) return;
+    setIsCapturing(true);
+    try {
+      const res = await api.post(`/plants/${plantId}/cam/capture`);
+      console.log("캡처 성공:", res.data);
+      alert('스냅샷이 갤러리에 저장되었습니다!');
+    } catch (err) {
+      console.error("캡처 실패:", err);
+      alert('캡처에 실패했습니다. 카메라 상태를 확인해주세요.');
+    } finally {
+      setIsCapturing(false);
+    }
+  };
   // 캐릭터의 표정 결정
   const getCharacterMood = () => {
     const criticalItems = statusData.filter(s => s.value === 'critical');
@@ -961,6 +1082,7 @@ export function StatusView() {
         </motion.div>
 
         {/* --- 생장 단계 인터페이스 --- */}
+        {/* --- 생장 단계 인터페이스 (실제 레벨 연동형) --- */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -972,20 +1094,19 @@ export function StatusView() {
                 <Sprout className="size-5 text-emerald-500" />
                 생장 타임라인
               </h3>
-              <p className="text-sm text-emerald-700/70 mt-1">심은 지 {daysSincePlanted}일째, 무럭무럭 자라는 중!</p>
+              <p className="text-sm text-emerald-700/70 mt-1">
+                심은 지 {daysSincePlanted}일째, 현재 <span className="font-bold text-emerald-600">{LEVEL_NAMES[currentLevel]}</span> 단계입니다!
+              </p>
             </div>
             <div className="text-right">
-              <span className="text-2xl font-black text-emerald-600">{growthProgress}%</span>
-              <p className="text-[10px] text-emerald-500 uppercase tracking-widest font-bold">Progress</p>
+              {/* 4. 퍼센트 대신 레벨 이름 표시 */}
+              <span className="text-2xl font-black text-emerald-600">{LEVEL_NAMES[currentLevel]}</span>
+              <p className="text-[10px] text-emerald-500 uppercase tracking-widest font-bold">Current Level</p>
             </div>
           </div>
 
-          {/* 타임라인 바 */}
           <div className="relative pt-8 pb-4 px-2">
-            {/* 배경 라인 */}
             <div className="absolute top-[42px] left-0 right-0 h-1.5 bg-emerald-100 rounded-full" />
-
-            {/* 진행 라인 */}
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${growthProgress}%` }}
@@ -993,16 +1114,17 @@ export function StatusView() {
               className="absolute top-[42px] left-0 h-1.5 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full z-10 shadow-[0_0_10px_rgba(16,185,129,0.3)]"
             />
 
-            {/* 단계별 아이콘 점들 */}
             <div className="relative flex justify-between z-20">
               {growthStages.map((stage, idx) => {
-                const isReached = growthProgress >= stage.minProgress;
+                // 현재 레벨인지, 이미 지나온 레벨인지 판단
+                const isReached = currentLevel >= (idx + 1);
+                const isCurrent = currentLevel === (idx + 1);
+
                 return (
                   <div key={idx} className="flex flex-col items-center group">
                     <motion.div
-                      initial={false}
                       animate={{
-                        scale: isReached ? [1, 1.2, 1] : 1,
+                        scale: isCurrent ? [1, 1.2, 1] : 1,
                         backgroundColor: isReached ? '#10b981' : '#ecfdf5',
                       }}
                       className={`size-10 rounded-full flex items-center justify-center text-xl shadow-lg border-2 ${isReached ? 'border-white text-white' : 'border-emerald-100 text-emerald-300'
@@ -1013,12 +1135,6 @@ export function StatusView() {
                     <span className={`text-[11px] mt-2 font-bold ${isReached ? 'text-emerald-700' : 'text-emerald-300'}`}>
                       {stage.label}
                     </span>
-                    {/* 수확 시기 팁 (결실 단계 클릭 시 노출 가능) */}
-                    {stage.label === '결실' && isReached && (
-                      <div className="absolute -bottom-10 whitespace-nowrap bg-emerald-600 text-white text-[10px] px-2 py-1 rounded-md animate-bounce">
-                        지금이 채취 적기! ✂️
-                      </div>
-                    )}
                   </div>
                 );
               })}
@@ -1116,52 +1232,55 @@ export function StatusView() {
         </div>
       </div>
 
+      {/* ✅ 이 주석 아래의 <Dialog> 전체를 아래 내용으로 덮어쓰세요! */}
       {/* 실시간 카메라 모달 */}
       <Dialog open={showCamera} onOpenChange={setShowCamera}>
-        <DialogContent className="max-w-3xl bg-white/95 backdrop-blur-md">
+        <DialogContent className="max-w-3xl bg-white/95 backdrop-blur-md border-2 border-emerald-100 rounded-3xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Video className="size-5 text-green-600" />
-              실시간 카메라 - {plantName}
+            <DialogTitle className="flex items-center gap-2 text-emerald-900">
+              <Video className="size-5 text-emerald-600" />
+              실시간 홈캠 - {plantName}
             </DialogTitle>
             <DialogDescription>
-              기기의 카메라를 통해 실시간으로 식물 상태를 확인하세요
+              기기의 카메라를 통해 실시간으로 식물 상태를 확인하세요.
             </DialogDescription>
           </DialogHeader>
+
           <div className="space-y-4">
-            <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-              {/* 실제로는 기기 카메라 스트리밍 영상이 들어갈 위치 */}
-              <ImageWithFallback
-                src="https://images.unsplash.com/photo-1618164436241-4473940d1f5c?w=800"
-                alt={`${plantName} 실시간 영상`}
-                className="w-full h-full object-cover"
-              />
+            <div className="relative aspect-video bg-slate-900 rounded-2xl overflow-hidden shadow-inner">
+              {/* 🚀 실제 스트리밍 URL 연동 */}
+              {streamUrl ? (
+                <img
+                  src={streamUrl}
+                  alt="실시간 스트림"
+                  className="w-full h-full object-contain"
+                  onError={() => console.error("스트림 연결 오류")}
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center text-emerald-100 gap-3">
+                  <div className="size-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                  <p className="text-sm font-medium">카메라 연결 중...</p>
+                </div>
+              )}
 
               {/* 라이브 표시 */}
-              <div className="absolute top-4 left-4 flex items-center gap-2 bg-red-600 text-white px-3 py-1 rounded-full text-sm font-medium">
+              <div className="absolute top-4 left-4 flex items-center gap-2 bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold tracking-wider shadow-lg">
                 <span className="size-2 bg-white rounded-full animate-pulse" />
                 LIVE
-              </div>
-
-              {/* 타임스탬프 */}
-              <div className="absolute bottom-4 left-4 bg-black/70 text-white px-3 py-1 rounded text-sm">
-                {new Date().toLocaleString('ko-KR')}
               </div>
             </div>
 
             <div className="flex gap-2">
               <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => {
-                  console.log('스냅샷 저장');
-                  alert('스냅샷이 저장되었습니다!');
-                }}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-12 rounded-xl"
+                onClick={handleCapture}
+                disabled={isCapturing || !streamUrl}
               >
-                📸 스냅샷 저장
+                {isCapturing ? '📸 캡처 중...' : '📸 현재 상태 캡처'}
               </Button>
               <Button
                 variant="outline"
+                className="h-12 px-6 rounded-xl border-emerald-200 text-emerald-800 font-bold"
                 onClick={() => setShowCamera(false)}
               >
                 닫기
