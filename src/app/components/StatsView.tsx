@@ -157,30 +157,39 @@ export function StatsView({ setError }: StatsViewProps) {
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: 0.1 }}
+                            className="w-full" // 박스가 밀리지 않게 명시적 너비 설정
                         >
-                            <Card className="border-none bg-white/60 backdrop-blur-md rounded-[2.5rem] p-6 shadow-xl border border-white/40">
+                            <Card className="border-none bg-white/60 backdrop-blur-md rounded-[2.5rem] p-5 md:p-6 shadow-xl border border-white/40 overflow-hidden">
                                 <div className="space-y-6">
+                                    {/* 시작일 설정 */}
                                     <div className="space-y-3">
                                         <label className="text-[11px] font-black text-emerald-800 flex items-center gap-1.5 uppercase tracking-wider">
                                             <CalendarIcon className="size-3" /> 시작일
                                         </label>
-                                        <input
-                                            type="date"
-                                            value={dateRange.startDate}
-                                            onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
-                                            className="w-full text-sm font-bold p-3 rounded-2xl bg-white/80 border-2 border-emerald-100 text-emerald-900 focus:border-emerald-500 focus:ring-0 outline-none transition-colors"
-                                        />
+                                        <div className="relative w-full"> {/* 감싸는 div 추가로 안정성 확보 */}
+                                            <input
+                                                type="date"
+                                                value={dateRange.startDate}
+                                                onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
+                                                className="w-full max-w-full box-border text-sm font-bold p-3 rounded-2xl bg-white/80 border-2 border-emerald-100 text-emerald-900 focus:border-emerald-500 focus:ring-0 outline-none transition-colors appearance-none"
+                                            // appearance-none은 브라우저 기본 스타일 간섭을 줄여줍니다.
+                                            />
+                                        </div>
                                     </div>
+
+                                    {/* 종료일 설정 */}
                                     <div className="space-y-3">
                                         <label className="text-[11px] font-black text-emerald-800 flex items-center gap-1.5 uppercase tracking-wider">
                                             <CalendarIcon className="size-3" /> 종료일
                                         </label>
-                                        <input
-                                            type="date"
-                                            value={dateRange.endDate}
-                                            onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
-                                            className="w-full text-sm font-bold p-3 rounded-2xl bg-white/80 border-2 border-emerald-100 text-emerald-900 focus:border-emerald-500 focus:ring-0 outline-none transition-colors"
-                                        />
+                                        <div className="relative w-full">
+                                            <input
+                                                type="date"
+                                                value={dateRange.endDate}
+                                                onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
+                                                className="w-full max-w-full box-border text-sm font-bold p-3 rounded-2xl bg-white/80 border-2 border-emerald-100 text-emerald-900 focus:border-emerald-500 focus:ring-0 outline-none transition-colors appearance-none"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             </Card>
