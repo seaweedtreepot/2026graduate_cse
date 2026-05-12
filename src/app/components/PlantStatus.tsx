@@ -530,10 +530,10 @@ export function StatusView({ setError }: StatusViewProps) {
     return tips[label]?.[value] || '정보를 불러오는 중입니다...';
   };
   return (
-    <div className="min-h-screen w-full relative overflow-hidden">
+    <div className="min-h-[100dvh] w-full relative overflow-x-hidden"> {/* overflow-hidden을 overflow-x-hidden으로 변경 */}
       {/* 인터랙티브 배경 (상태에 따라 변화) */}
       <motion.div
-        className="fixed inset-0 -z-10"
+        className="fixed inset-0 -z-10 w-[110vw] h-[110dvh] -left-[5vw] -top-[5dvh]" // 크기를 키우고 살짝 위/왼쪽으로 이동
         style={{
           x: smoothMouseX,
           y: smoothMouseY,
