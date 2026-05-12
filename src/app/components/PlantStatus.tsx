@@ -80,24 +80,37 @@ export function StatusView({ setError }: StatusViewProps) {
 
   const fetchStatus = async () => {
     try {
-      const res = await api.get(`/plants/${plantId}/sensors/latest`);
+      // 1. 주소 수정: /api/v1과 /status 확인!
+      const res = await api.get(`/plants/${plantId}/status`);
       const data = res.data;
+      console.log("🚀 백엔드에서 도착한 데이터:", data);
 
-      // 3. [여기 추가] 서버에서 준 level이 있다면 상태 업데이트
+      // 2. 서버에서 준 level이 있다면 업데이트
       if (data.level) {
         setCurrentLevel(data.level);
       }
 
+      // 3. 백엔드의 temp, humidity를 프론트의 습도, 온도 칸에 매핑
       const updatedData: StatusIndicator[] = [
-        { icon: Droplets, label: '습도', value: determineStatus('습도', data.moisture) },
-        { icon: Sun, label: '조도', value: determineStatus('조도', data.light) },
-        { icon: Sprout, label: '흙의 상태', value: data.soilStatus > 20 ? 'good' : 'critical' },
-        { icon: Bug, label: '벌레', value: determineStatus('벌레', data.bug) },
-        { icon: Thermometer, label: '온도', value: determineStatus('온도', data.temperature) },
-        { icon: AlertTriangle, label: '질병', value: determineStatus('질병', data.disease) },
+        {
+          icon: Droplets,
+          label: '습도',
+          value: determineStatus('습도', data.humidity) // data.moisture 대신 data.humidity
+        },
+        {
+          icon: Thermometer,
+          label: '온도',
+          value: determineStatus('온도', data.temp) // data.temperature 대신 data.temp
+        },
+        // 나머지는 아직 백엔드에 없으므로 기본값(good) 처리
+        { icon: Sun, label: '조도', value: 'good' },
+        { icon: Sprout, label: '흙의 상태', value: 'good' },
+        { icon: Bug, label: '벌레', value: 'good' },
+        { icon: AlertTriangle, label: '질병', value: 'good' },
       ];
+
       setStatusData(updatedData);
-      setLastUpdated(new Date(data.timestamp).toLocaleTimeString('ko-KR'));
+      setLastUpdated(new Date().toLocaleTimeString('ko-KR'));
       setError(false);
     } catch (err) {
       console.error("데이터 호출 실패:", err);
@@ -440,38 +453,37 @@ export function StatusView({ setError }: StatusViewProps) {
     const criticalItems = statusData.filter(s => s.value === 'critical');
     const warningItems = statusData.filter(s => s.value === 'warning');
 
-    // 물주기 완료 시 기쁜 모습
+    // 기본 설정 (단계별 기본 이미지 이름 예시)
+    let mood = 'happy';
+    let scale = 1.05;
+    let rotation = 0;
+    let color = 'text-green-600';
+
+    // 상태에 따른 mood 결정
     if (wateringComplete || recentlySolved === 'humidity') {
-      return { emoji: '🥰', mood: 'watered', scale: 1.15, rotation: 0, color: 'text-blue-600' };
+      mood = 'watered';
+      scale = 1.15;
+    } else if (diseaseStatus?.value === 'critical') {
+      mood = 'sick';
+      scale = 0.85;
+      rotation = -10;
+    } else if (bugStatus?.value === 'critical' || bugStatus?.value === 'warning') {
+      mood = 'suffering';
+      scale = 0.9;
+      rotation = -5;
+    } else if (criticalItems.length > 0) {
+      mood = 'sad';
+      scale = 0.9;
+    } else if (warningItems.length > 0) {
+      mood = 'worried';
+      scale = 0.95;
     }
 
-    // 질병이 있으면 아픈 모습
-    if (diseaseStatus?.value === 'critical') {
-      return { emoji: '🤢', mood: 'sick', scale: 0.85, rotation: -10, color: 'text-purple-600' };
-    }
+    // [수정 포인트] 이미지 경로 생성
+    // 예: /assets/character/lv1_happy.png
+    const imageSrc = `/src/public/assets/character/lv${currentLevel}_${mood}.png`;
 
-    // 벌레가 날아갔으면 기쁜 모습
-    if ((bugStatus?.value === 'critical' || bugStatus?.value === 'warning') && bugsBlownAway) {
-      return { emoji: '🤗', mood: 'relieved', scale: 1.1, rotation: 0, color: 'text-green-600' };
-    }
-
-    // 벌레가 있으면 괴로워하는 모습
-    if (bugStatus?.value === 'critical' || bugStatus?.value === 'warning') {
-      return { emoji: '😫', mood: 'suffering', scale: 0.9, rotation: -5, color: 'text-gray-600' };
-    }
-
-    // 바람 공격 시
-    if (recentlySolved === 'bug') {
-      return { emoji: '😤', mood: 'fighting', scale: 1.05, rotation: 0, color: 'text-orange-600' };
-    }
-
-    if (criticalItems.length > 0) {
-      return { emoji: '😰', mood: 'sad', scale: 0.9, rotation: -5, color: 'text-rose-600' };
-    }
-    if (warningItems.length > 0) {
-      return { emoji: '😟', mood: 'worried', scale: 0.95, rotation: 0, color: 'text-amber-600' };
-    }
-    return { emoji: '😊', mood: 'happy', scale: 1.05, rotation: 5, color: 'text-green-600' };
+    return { imageSrc, mood, scale, rotation, color };
   };
 
   const characterMood = getCharacterMood();
@@ -1056,7 +1068,31 @@ export function StatusView({ setError }: StatusViewProps) {
               ease: 'easeInOut',
             }}
           >
-            {characterMood.emoji}
+            {/* 캐릭터 (이미지로 교체됨) */}
+            <motion.div
+              className="relative z-30 mb-4"
+              animate={{
+                // 상태별로 이미지가 조금씩 움직이는 효과
+                y: characterMood.mood === 'suffering' ? [-5, 5, -5] : [0, -10, 0],
+                rotate: characterMood.mood === 'fighting' ? [-15, 15, -15] : [0, 0, 0],
+              }}
+              transition={{
+                duration: 2,
+                repeat: Infinity,
+                ease: 'easeInOut',
+              }}
+            >
+              <img
+                src={characterMood.imageSrc}
+                alt="반려식물 캐릭터"
+                className="w-120 h-70 object-contain drop-shadow-2xl"
+                // 캐릭터 크기는 w-56 h-56 부분을 조절해서 맞추세요.
+                onError={(e) => {
+                  // 혹시 이미지가 없을 경우를 대비한 방어 코드 (기본 이미지로 대체)
+                  (e.target as HTMLImageElement).src = `/assets/character/lv${currentLevel}_happy.png`;
+                }}
+              />
+            </motion.div>
           </motion.div>
 
           <motion.button

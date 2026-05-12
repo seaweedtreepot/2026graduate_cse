@@ -5,28 +5,31 @@ import { Button } from './ui/button';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
     Droplets, Sun, Sprout, Bug, Thermometer, AlertTriangle,
-    Calendar as CalendarIcon, ChevronLeft
+    Calendar as CalendarIcon, Library, TrendingUp, Activity
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import api from '../api/axios';
 
-// 6개 항목 정의
 const SENSOR_TYPES = [
-    { id: 'moisture', label: '습도', icon: Droplets, color: '#3b82f6' },
+    { id: 'moisture', label: '습도', icon: Droplets, color: '#10b981' },
     { id: 'light', label: '조도', icon: Sun, color: '#f59e0b' },
-    { id: 'soil', label: '흙의 상태', icon: Sprout, color: '#10b981' },
+    { id: 'soil', label: '흙의 상태', icon: Sprout, color: '#059669' },
     { id: 'bug', label: '벌레', icon: Bug, color: '#64748b' },
     { id: 'temperature', label: '온도', icon: Thermometer, color: '#ef4444' },
     { id: 'disease', label: '질병', icon: AlertTriangle, color: '#a855f7' },
 ];
+
+interface HistoryData {
+    timestamp: string;
+    value: number;
+    type: string;
+}
+
 interface StatsViewProps {
     setError: (val: boolean) => void;
 }
+
 export function StatsView({ setError }: StatsViewProps) {
-    interface HistoryData {
-        timestamp: string;
-        value: number;
-        type: string;
-    }
     const [searchParams] = useSearchParams();
     const plantId = searchParams.get('id');
 
@@ -34,7 +37,6 @@ export function StatsView({ setError }: StatsViewProps) {
     const [selectedType, setSelectedType] = useState('moisture');
     const [isLoading, setIsLoading] = useState(false);
 
-    // 날짜 범위 설정 (기본 최근 7일)
     const [dateRange, setDateRange] = useState({
         startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         endDate: new Date().toISOString().split('T')[0],
@@ -46,12 +48,11 @@ export function StatsView({ setError }: StatsViewProps) {
         if (!plantId) return;
         setIsLoading(true);
         try {
-            // 명세서: GET /api/v1/plants/{plantId}/sensors/history?startDate=...&endDate=...&type=...
             const res = await api.get(`/plants/${plantId}/sensors/history`, {
                 params: {
                     startDate: dateRange.startDate,
                     endDate: dateRange.endDate,
-                    type: selectedType // 6항목 중 선택된 타입 전송
+                    type: selectedType
                 }
             });
             setHistoryData(res.data);
@@ -68,125 +69,202 @@ export function StatsView({ setError }: StatsViewProps) {
         fetchHistory();
     }, [selectedType, dateRange, plantId]);
 
+    // 평균값 계산
+    const averageValue = historyData.length > 0
+        ? (historyData.reduce((acc, c) => acc + c.value, 0) / historyData.length).toFixed(1)
+        : '-';
+
     return (
-        <div className="p-6 max-w-6xl mx-auto space-y-6 pb-20">
-            {/* 헤더 섹션 */}
-            <div className="flex flex-col gap-1">
-                <h2 className="text-3xl font-black text-emerald-900 flex items-center gap-2">
-                    <activeSensor.icon className="size-8" style={{ color: activeSensor.color }} />
-                    데이터 수치 도서관
-                </h2>
-                <p className="text-emerald-700/60 font-medium">과거 기록을 통해 식물의 성장 패턴을 분석합니다.</p>
-            </div>
+        <div className="min-h-screen w-full bg-gradient-to-br from-green-50 via-emerald-50 to-teal-100 p-6 pb-24 relative overflow-hidden">
+            {/* 배경 데코레이션 */}
+            <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-200/20 rounded-full blur-3xl -z-10" />
+            <div className="absolute bottom-0 left-0 w-96 h-96 bg-teal-200/20 rounded-full blur-3xl -z-10" />
 
-            {/* 6항목 선택 필터 그리드 */}
-            <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-                {SENSOR_TYPES.map((type) => (
-                    <Button
-                        key={type.id}
-                        variant={selectedType === type.id ? 'default' : 'outline'}
-                        onClick={() => setSelectedType(type.id)}
-                        className={`h-auto py-3 flex flex-col gap-1 rounded-2xl transition-all ${selectedType === type.id
-                            ? 'bg-emerald-600 shadow-lg scale-105'
-                            : 'hover:bg-emerald-50 border-emerald-100 text-emerald-800'
-                            }`}
-                    >
-                        <type.icon className="size-5" />
-                        <span className="text-xs font-bold">{type.label}</span>
-                    </Button>
-                ))}
-            </div>
-
-            {/* 날짜 선택 및 통계 카드 */}
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                {/* 통계 요약 (좌측 1칸) */}
-                <div className="space-y-4">
-                    <Card className="border-none bg-emerald-900 text-white shadow-xl rounded-3xl">
-                        <CardHeader className="pb-2">
-                            <CardDescription className="text-emerald-300 font-bold uppercase text-[10px]">Average</CardDescription>
-                            <CardTitle className="text-4xl font-black">
-                                {historyData.length > 0
-                                    ? (historyData.reduce((acc, c) => acc + c.value, 0) / historyData.length).toFixed(1)
-                                    : '-'}
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-xs text-emerald-200">선택한 기간의 평균 {activeSensor.label} 수치입니다.</p>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="border-2 border-emerald-100 rounded-3xl p-4 space-y-4">
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-emerald-800 flex items-center gap-1">
-                                <CalendarIcon className="size-3" /> 시작일
-                            </label>
-                            <input
-                                type="date"
-                                value={dateRange.startDate}
-                                onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
-                                className="w-full text-sm p-2 rounded-xl bg-emerald-50 border-none focus:ring-2 focus:ring-emerald-500"
-                            />
+            <div className="max-w-6xl mx-auto space-y-8 relative z-10">
+                {/* 헤더 섹션 */}
+                <motion.div
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex flex-col gap-2"
+                >
+                    <div className="flex items-center gap-3">
+                        <div className="p-3 bg-emerald-600 text-white rounded-2xl shadow-lg shadow-emerald-200">
+                            <Library size={28} />
                         </div>
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-emerald-800 flex items-center gap-1">
-                                <CalendarIcon className="size-3" /> 종료일
-                            </label>
-                            <input
-                                type="date"
-                                value={dateRange.endDate}
-                                onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
-                                className="w-full text-sm p-2 rounded-xl bg-emerald-50 border-none focus:ring-2 focus:ring-emerald-500"
-                            />
+                        <div>
+                            <h2 className="text-3xl font-black text-emerald-900 tracking-tight">데이터 수치 도서관</h2>
+                            <p className="text-emerald-700/60 font-bold flex items-center gap-1.5">
+                                <Activity size={14} /> 식물의 성장 패턴을 분석하고 기록합니다
+                            </p>
                         </div>
-                    </Card>
+                    </div>
+                </motion.div>
+
+                {/* 센서 타입 필터 그리드 */}
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                    {SENSOR_TYPES.map((type, idx) => (
+                        <motion.button
+                            key={type.id}
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: idx * 0.05 }}
+                            onClick={() => setSelectedType(type.id)}
+                            className={`relative px-4 py-4 flex flex-col items-center gap-2 rounded-[2rem] border-2 transition-all group ${selectedType === type.id
+                                ? 'bg-white border-emerald-500 shadow-xl shadow-emerald-100 scale-105 z-20'
+                                : 'bg-white/40 border-white/60 text-emerald-800/60 hover:bg-white/60 hover:border-emerald-200'
+                                }`}
+                        >
+                            <type.icon
+                                className={`size-6 transition-colors ${selectedType === type.id ? 'text-emerald-600' : 'text-emerald-400'}`}
+                            />
+                            <span className={`text-xs font-black tracking-tight ${selectedType === type.id ? 'text-emerald-900' : 'text-emerald-800/60'}`}>
+                                {type.label}
+                            </span>
+                            {selectedType === type.id && (
+                                <motion.div layoutId="active-dot" className="absolute -bottom-1 w-1 h-1 bg-emerald-500 rounded-full" />
+                            )}
+                        </motion.button>
+                    ))}
                 </div>
 
-                {/* 차트 영역 (우측 3칸) */}
-                <Card className="lg:col-span-3 border-2 border-emerald-50 shadow-2xl rounded-3xl overflow-hidden bg-white/50 backdrop-blur-sm">
-                    <CardHeader className="border-b border-emerald-50 px-8 py-6">
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <CardTitle className="text-xl font-bold text-slate-800">{activeSensor.label} 추이 분석</CardTitle>
-                                <CardDescription>시각화된 센서 데이터를 확인하세요</CardDescription>
-                            </div>
-                            {isLoading && <div className="size-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />}
-                        </div>
-                    </CardHeader>
-                    <CardContent className="p-6 h-[400px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={historyData}>
-                                <defs>
-                                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor={activeSensor.color} stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor={activeSensor.color} stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                <XAxis
-                                    dataKey="timestamp"
-                                    tickFormatter={(str) => new Date(str).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
-                                    stroke="#94a3b8"
-                                    fontSize={12}
-                                    tickMargin={10}
-                                />
-                                <YAxis stroke="#94a3b8" fontSize={12} tickMargin={10} />
-                                <Tooltip
-                                    contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}
-                                    labelFormatter={(label) => new Date(label).toLocaleString('ko-KR')}
-                                />
-                                <Area
-                                    type="monotone"
-                                    dataKey="value"
-                                    stroke={activeSensor.color}
-                                    strokeWidth={4}
-                                    fillOpacity={1}
-                                    fill="url(#colorValue)"
-                                    animationDuration={1500}
-                                />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </CardContent>
-                </Card>
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    {/* 통계 및 설정 패널 (좌측) */}
+                    <div className="space-y-6">
+                        <motion.div
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                        >
+                            <Card className="border-none bg-emerald-900 text-white shadow-2xl rounded-[2.5rem] overflow-hidden relative group">
+                                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
+                                    <TrendingUp size={80} />
+                                </div>
+                                <CardHeader className="pb-2 relative z-10">
+                                    <CardDescription className="text-emerald-400 font-black uppercase text-[10px] tracking-widest">Selected Average</CardDescription>
+                                    <CardTitle className="text-5xl font-black tracking-tighter flex items-baseline gap-1">
+                                        {averageValue}
+                                        <span className="text-lg font-bold text-emerald-400/60">%</span>
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="relative z-10">
+                                    <p className="text-xs text-emerald-200/80 leading-relaxed font-medium">
+                                        선택한 기간 동안의 평균 <span className="text-white font-bold">{activeSensor.label}</span> 수치입니다.
+                                    </p>
+                                </CardContent>
+                            </Card>
+                        </motion.div>
+
+                        <motion.div
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.1 }}
+                        >
+                            <Card className="border-none bg-white/60 backdrop-blur-md rounded-[2.5rem] p-6 shadow-xl border border-white/40">
+                                <div className="space-y-6">
+                                    <div className="space-y-3">
+                                        <label className="text-[11px] font-black text-emerald-800 flex items-center gap-1.5 uppercase tracking-wider">
+                                            <CalendarIcon className="size-3" /> 시작일
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={dateRange.startDate}
+                                            onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
+                                            className="w-full text-sm font-bold p-3 rounded-2xl bg-white/80 border-2 border-emerald-100 text-emerald-900 focus:border-emerald-500 focus:ring-0 outline-none transition-colors"
+                                        />
+                                    </div>
+                                    <div className="space-y-3">
+                                        <label className="text-[11px] font-black text-emerald-800 flex items-center gap-1.5 uppercase tracking-wider">
+                                            <CalendarIcon className="size-3" /> 종료일
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={dateRange.endDate}
+                                            onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
+                                            className="w-full text-sm font-bold p-3 rounded-2xl bg-white/80 border-2 border-emerald-100 text-emerald-900 focus:border-emerald-500 focus:ring-0 outline-none transition-colors"
+                                        />
+                                    </div>
+                                </div>
+                            </Card>
+                        </motion.div>
+                    </div>
+
+                    {/* 메인 차트 패널 (우측) */}
+                    <motion.div
+                        className="lg:col-span-3"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 }}
+                    >
+                        <Card className="h-full border-none shadow-2xl rounded-[3rem] overflow-hidden bg-white/80 backdrop-blur-md border border-white">
+                            <CardHeader className="border-b border-emerald-50 px-8 py-8 flex flex-row justify-between items-center bg-white/40">
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                        <CardTitle className="text-2xl font-black text-slate-800 tracking-tight">
+                                            {activeSensor.label} 추이 분석
+                                        </CardTitle>
+                                    </div>
+                                    <CardDescription className="text-slate-500 font-medium">시간의 흐름에 따른 식물의 건강 변화를 확인하세요</CardDescription>
+                                </div>
+                                {isLoading && (
+                                    <div className="size-6 border-4 border-emerald-500/20 border-t-emerald-600 rounded-full animate-spin" />
+                                )}
+                            </CardHeader>
+                            <CardContent className="p-8 h-[450px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={historyData}>
+                                        <defs>
+                                            <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor={activeSensor.color} stopOpacity={0.4} />
+                                                <stop offset="95%" stopColor={activeSensor.color} stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
+                                        <XAxis
+                                            dataKey="timestamp"
+                                            tickFormatter={(str) => new Date(str).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
+                                            stroke="#64748b"
+                                            fontSize={11}
+                                            fontWeight={700}
+                                            tickMargin={15}
+                                            axisLine={false}
+                                            tickLine={false}
+                                        />
+                                        <YAxis
+                                            stroke="#64748b"
+                                            fontSize={11}
+                                            fontWeight={700}
+                                            tickMargin={15}
+                                            axisLine={false}
+                                            tickLine={false}
+                                        />
+                                        <Tooltip
+                                            content={({ active, payload, label }) => {
+                                                if (active && payload && payload.length) {
+                                                    return (
+                                                        <div className="bg-emerald-900 text-white p-4 rounded-2xl shadow-2xl border-none backdrop-blur-lg">
+                                                            <p className="text-[10px] font-black text-emerald-400 uppercase mb-1">{new Date(label).toLocaleString()}</p>
+                                                            <p className="text-lg font-black">{payload[0].value}<span className="text-xs ml-0.5 opacity-70">%</span></p>
+                                                        </div>
+                                                    );
+                                                }
+                                                return null;
+                                            }}
+                                        />
+                                        <Area
+                                            type="monotone"
+                                            dataKey="value"
+                                            stroke={activeSensor.color}
+                                            strokeWidth={4}
+                                            fillOpacity={1}
+                                            fill="url(#colorValue)"
+                                            animationDuration={2000}
+                                        />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </CardContent>
+                        </Card>
+                    </motion.div>
+                </div>
             </div>
         </div>
     );

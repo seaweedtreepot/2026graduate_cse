@@ -5,6 +5,7 @@ import { DeviceRegistrationPage } from './pages/DeviceRegistrationPage';
 import { PlantSelectionPage } from './pages/PlantSelectionPage';
 import { PlantStatusPage } from './pages/PlantStatusPage';
 import { PlantList } from './components/PlantList';
+import { ForgotPassword } from './pages/ForgotPassword';
 
 export const router = createBrowserRouter([
   {
@@ -17,8 +18,13 @@ export const router = createBrowserRouter([
   }
   ,
   {
-    path: '/plantList',
+    path: '/plant-list',
     element: <PlantList />,
+  }
+  ,
+  {
+    path: '/forgot-password',
+    element: <ForgotPassword />,
   }
   ,
   {
@@ -32,5 +38,9 @@ export const router = createBrowserRouter([
   {
     path: '/plant-status',
     element: <PlantStatusPage />,
+  },
+  {
+    path: '*',
+    element: <div className="p-10">404: 경로를 찾을 수 없습니다. 주소창을 확인하세요!</div>,
   },
 ]);

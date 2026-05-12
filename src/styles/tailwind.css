@@ -1,4 +1,7 @@
-@import 'tailwindcss' source(none);
-@source '../**/*.{js,ts,jsx,tsx}';
+/* src/styles/tailwind.css */
+@import "tailwindcss";
 
-@import 'tw-animate-css';
+@source "../../src/**/*.{js,ts,jsx,tsx}";
+/* 경로가 정확한지 확인! */
+
+@import "tw-animate-css";

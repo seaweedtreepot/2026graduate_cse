@@ -46,6 +46,7 @@
     "cmdk": "1.1.1",
     "date-fns": "3.6.0",
     "embla-carousel-react": "8.6.0",
+    "firebase": "^12.13.0",
     "input-otp": "1.4.2",
     "lucide-react": "0.487.0",
     "motion": "12.23.24",
@@ -67,6 +68,9 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.1.12",
+    "@types/node": "^25.6.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "4.7.0",
     "tailwindcss": "4.1.12",
     "vite": "6.3.5"
