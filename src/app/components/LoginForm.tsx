@@ -39,16 +39,20 @@ export function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-green-50 via-emerald-50 to-teal-100 p-0 sm:p-4">
-      {/* 배경에 떠다니는 듯한 느낌의 블러 효과 원형 (AI/디지털 느낌 강조) */}
-      <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-green-200/40 rounded-full blur-3xl animate-pulse" />
-      <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-emerald-200/40 rounded-full blur-3xl animate-pulse delay-700" />
+    // ✅ 부모: 모바일에서는 위아래 여백 없이 꽉 채움
+    <div className="min-h-screen w-full flex flex-col sm:items-center sm:justify-center bg-gradient-to-br from-green-50 via-emerald-50 to-teal-100 p-0 sm:p-4">
 
-      <Card className="w-full max-w-md border-none shadow-2xl bg-white/80 backdrop-blur-md z-10">
-        <CardHeader className="space-y-2 text-center">
+      {/* 배경 장식 (모바일에서는 불필요하면 hidden 처리 가능) */}
+      <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-green-200/40 rounded-full blur-3xl animate-pulse sm:block hidden" />
+
+      {/* ✅ Card: 모바일에서 min-h-screen과 rounded-none으로 '앱'처럼 보이게 함 */}
+      <Card className="w-full sm:max-w-md min-h-screen sm:min-h-fit border-none shadow-none sm:shadow-2xl bg-white/90 sm:bg-white/80 backdrop-blur-md z-10 rounded-none sm:rounded-[2.5rem] flex flex-col">
+
+        {/* ✅ 헤더: 노치(Safe Area) 고려한 패딩 */}
+        <CardHeader className="space-y-2 text-center pt-[calc(3rem+env(safe-area-inset-top))] pb-6 px-8">
           <div className="flex justify-center mb-2">
             <div className="p-3 bg-emerald-100 rounded-2xl text-emerald-600 shadow-inner">
-              <Sprout size={36} className="animate-bounce-slow" />
+              <Sprout size={40} className="animate-bounce-slow" />
             </div>
           </div>
           <CardTitle className="text-3xl font-extrabold tracking-tight text-emerald-900">
@@ -133,32 +137,26 @@ export function LoginForm() {
           </form>
         </CardContent>
 
-        <CardFooter className="flex flex-col space-y-6 pt-2">
-          {/* 가입 유도 섹션 */}
+        {/* ✅ 푸터: 하단 홈 바(Safe Area) 고려한 패딩 */}
+        <CardFooter className="flex flex-col space-y-8 pt-4 pb-[calc(2rem+env(safe-area-inset-bottom))] px-10">
           <div className="text-sm text-center text-emerald-800">
             아직 정원사가 아니신가요?{' '}
-            <button
-              type="button"
-              className="font-bold text-emerald-600 hover:text-emerald-500 hover:underline underline-offset-4"
-              onClick={() => navigate('/register')}
-            >
-              지금 씨앗 심기 (회원가입)
-            </button>
+            <button type="button" className="font-black text-emerald-600 underline underline-offset-4" onClick={() => navigate('/register')}>회원가입</button>
           </div>
 
-          {/* 개발자용 빠른 메뉴 (디자인 개선) */}
           <div className="w-full flex items-center gap-2">
             <div className="h-[1px] flex-1 bg-emerald-100" />
             <span className="text-[10px] uppercase tracking-widest text-emerald-300 font-semibold">Dev Mode</span>
             <div className="h-[1px] flex-1 bg-emerald-100" />
           </div>
 
+          {/* ✅ 기능 추가: Dev Mode 클릭 시 이동 */}
           <button
             type="button"
-            className="flex items-center gap-2 text-xs text-emerald-400 hover:text-emerald-600 mx-auto transition-colors"
+            className="flex items-center gap-2 text-xs text-emerald-400 hover:text-emerald-600 mx-auto transition-colors font-bold"
             onClick={() => navigate('/plant-list')}
           >
-            <Leaf size={12} /> 기기 등록 프리뷰
+            <Leaf size={14} /> 기기 등록 프리뷰 (Dev)
           </button>
         </CardFooter>
       </Card>
