@@ -14,6 +14,13 @@ interface Plant {
     status: string;
     level: number;
 }
+// [추가] 테스트용 데이터 정의
+const DUMMY_PLANTS: Plant[] = [
+    { id: 101, name: "실험체 바질1", species: "BASIL", status: "good", level: 1 },
+    { id: 102, name: "실험체 바질2", species: "BASIL", status: "good", level: 1 },
+    { id: 103, name: "실험체 바질3", species: "BASIL", status: "good", level: 1 },
+    { id: 104, name: "실험체 바질4", species: "BASIL", status: "good", level: 1 },
+];
 
 export function PlantList() {
     const navigate = useNavigate();
@@ -29,8 +36,10 @@ export function PlantList() {
             const res = await api.get('/users/me/plants');
             setPlants(res.data);
         } catch (err) {
-            console.error("목록 호출 실패:", err);
+            console.error("목록 호출 실패 -> 테스트 모드 전환:", err);
             setIsError(true);
+            // 🎯 포인트: 에러 발생 시 테스트 식물 목록을 상태에 저장
+            setPlants(DUMMY_PLANTS);
         } finally {
             setIsLoading(false);
         }
@@ -112,45 +121,57 @@ export function PlantList() {
                     </motion.div>
                 </header>
 
-                {/* 🎯 [개선] 통합 가든 대시보드 패널: 중앙 배치 */}
-                <div className="w-full flex justify-center pt-2">
+                {/* 🎯 [개선] 모바일 최적화 대시보드 패널: 중앙 배치 및 줄바꿈 적용 */}
+                {/* 🎯 [개선] 가로 정렬 대시보드 패널: 아이콘과 텍스트를 나란히 배치 */}
+                <div className="w-full flex justify-center pt-2 px-2">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.1 }}
-                        // 하나의 큰 통합 패널 (반투명 백드롭 플러 사용)
                         className="w-full max-w-sm bg-white/40 backdrop-blur-xl rounded-[2.5rem] p-6 shadow-xl border border-white/80"
                     >
-                        <div className="flex items-center justify-center gap-10">
+                        <div className="grid grid-cols-2 items-center w-full">
 
-                            {/* 1. 전체 식물 (아이콘 + 숫자) */}
-                            <div className="flex items-center gap-3">
-                                <div className="p-3 bg-white rounded-2xl shadow-inner border border-emerald-50">
-                                    <Leaf className="size-7 text-emerald-300" />
+                            {/* 1. 전체 친구 섹션: [아이콘] [텍스트] [숫자] 가로로 시원하게 */}
+                            <div className="flex items-center justify-center gap-3 border-r border-emerald-100/50 pr-2">
+                                {/* 아이콘: 박스 크기와 아이콘 자체 크기 모두 업 */}
+                                <div className="shrink-0 p-3 bg-white/70 rounded-2xl shadow-inner border border-emerald-50">
+                                    <Leaf className="size-6 text-emerald-400" />
                                 </div>
-                                <div>
-                                    <p className="text-[10px] font-black text-emerald-800/40 uppercase tracking-widest mb-0.5">전체 친구</p>
-                                    <p className="text-3xl font-black text-emerald-950 tracking-tighter leading-none">{plants.length}<span className="text-sm font-bold opacity-30 ml-0.5">마리</span></p>
-                                </div>
+
+                                {/* 텍스트: 가로 한 줄로 배치하면 너무 기니까 줄바꿈 유지하면서 크기 업 */}
+                                <p className="shrink-0 text-[10px] font-black text-emerald-800/40 uppercase tracking-tighter leading-tight text-left">
+                                    전체<br />친구
+                                </p>
+
+                                {/* 숫자: 시원시원하게 키움 */}
+                                <p className="text-2xl font-black text-emerald-950 tracking-tighter leading-none whitespace-nowrap">
+                                    {plants.length}<span className="text-xs font-bold opacity-30 ml-1">마리</span>
+                                </p>
                             </div>
 
-                            {/* 세로 구분선 (은은하게) */}
-                            <div className="w-px h-12 bg-emerald-100/50" />
+                            {/* 2. 건강한 친구 섹션: 동일하게 가로 일렬 배치 */}
+                            <div className="flex items-center justify-center gap-3 pl-2">
+                                {/* 아이콘 */}
+                                <div className="shrink-0 p-3 bg-white/70 rounded-2xl shadow-inner border border-amber-50">
+                                    <Sparkles className="size-6 text-amber-400" />
+                                </div>
 
-                            {/* 2. 건강한 식물 (아이콘 + 숫자) */}
-                            <div className="flex items-center gap-3">
-                                <div className="p-3 bg-white rounded-2xl shadow-inner border border-amber-50">
-                                    <Sparkles className="size-7 text-amber-300" />
-                                </div>
-                                <div>
-                                    <p className="text-[10px] font-black text-amber-800/40 uppercase tracking-widest mb-0.5">건강한 친구</p>
-                                    <p className="text-3xl font-black text-emerald-600 tracking-tighter leading-none">{healthyPlantsCount}<span className="text-sm font-bold opacity-30 ml-0.5">마리</span></p>
-                                </div>
+                                {/* 텍스트 */}
+                                <p className="shrink-0 text-[10px] font-black text-amber-800/40 uppercase tracking-tighter leading-tight text-left">
+                                    건강한<br />친구
+                                </p>
+
+                                {/* 숫자 */}
+                                <p className="text-2xl font-black text-emerald-600 tracking-tighter leading-none whitespace-nowrap">
+                                    {healthyPlantsCount}<span className="text-xs font-bold opacity-30 ml-1">마리</span>
+                                </p>
                             </div>
 
                         </div>
                     </motion.div>
                 </div>
+
                 {/* [개선] 메인 리스트 -> 그리드 레이아웃 */}
                 {isLoading ? (
                     <div className="h-64 flex flex-col items-center justify-center text-emerald-500 gap-4">
@@ -223,8 +244,8 @@ export function PlantList() {
                     onClick={() => navigate('/plant-selection')}
                     // disabled={isError} <- 이 부분을 제거하여 항상 클릭 가능하게 만듭니다.
                     className={`pointer-events-auto flex items-center gap-3 px-8 py-4 rounded-full font-black text-lg transition-all shadow-2xl ${isError
-                            ? 'bg-amber-500 text-white shadow-[0_15px_30px_-5px_rgba(245,158,11,0.5)]' // 에러 시 주황색 (테스트 모드 가시화)
-                            : 'bg-emerald-600 text-white shadow-[0_15px_30px_-5px_rgba(16,185,129,0.5)]'
+                        ? 'bg-amber-500 text-white shadow-[0_15px_30px_-5px_rgba(245,158,11,0.5)]' // 에러 시 주황색 (테스트 모드 가시화)
+                        : 'bg-emerald-600 text-white shadow-[0_15px_30px_-5px_rgba(16,185,129,0.5)]'
                         }`}
                 >
                     {isError ? (

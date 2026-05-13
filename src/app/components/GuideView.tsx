@@ -33,14 +33,20 @@ export function GuideView() {
     const [activeTab, setActiveTab] = useState("care");
 
     return (
-        <div className="min-h-screen w-full bg-[#f8fafc] p-4 md:p-8 pb-32">
-            <div className="max-w-2xl mx-auto space-y-6">
+        /* 🎨 배경: 기존과 동일한 그라데이션 및 relative 설정 */
+        <div className="min-h-[100dvh] w-full bg-gradient-to-br from-green-50 via-emerald-50 to-teal-100 p-4 md:p-8 pb-32 relative overflow-x-hidden">
 
-                {/* 1. 히어로 섹션: 감성적인 비주얼과 능력치 */}
+            {/* ✨ [기존 유지] 배경 장식용 블러 원형 */}
+            <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-green-200/20 rounded-full blur-3xl -z-10" />
+            <div className="absolute bottom-[-10%] left-[-10%] w-96 h-96 bg-emerald-200/20 rounded-full blur-3xl -z-10" />
+
+            <div className="max-w-2xl mx-auto space-y-6 relative z-10">
+
+                {/* 1. 히어로 섹션 */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="relative h-80 rounded-[2.5rem] overflow-hidden shadow-2xl"
+                    className="relative h-80 rounded-[2.5rem] overflow-hidden shadow-2xl shadow-emerald-900/20"
                 >
                     <img
                         src="/assets/dashboard/dashBoard.png"
@@ -55,41 +61,41 @@ export function GuideView() {
                                 <p className="text-emerald-200 font-bold italic">{BASIL_GUIDE.nameEn}</p>
                             </div>
                             <div className="bg-white/20 backdrop-blur-md p-4 rounded-2xl border border-white/30 text-center">
-                                <p className="text-[10px] font-bold uppercase opacity-70">재배 난이도</p>
-                                <p className="text-xl font-black text-emerald-300">Easy</p>
+                                <p className="text-[10px] font-bold uppercase opacity-70 text-white">재배 난이도</p>
+                                <p className="text-xl font-black text-emerald-300 uppercase">Easy</p>
                             </div>
                         </div>
                     </div>
                 </motion.div>
 
-                {/* 2. 핵심 케어 지표: 프로그레스 바 스타일 */}
+                {/* 2. 핵심 케어 지표: 배경과 어울리도록 살짝 투명하게 조절 */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Card className="rounded-3xl border-none shadow-sm bg-white p-5">
+                    <Card className="rounded-[2rem] border-none shadow-sm bg-white/70 backdrop-blur-md p-6">
                         <div className="space-y-4">
-                            <div className="flex justify-between items-center text-sm font-bold text-slate-500">
-                                <span className="flex items-center gap-2"><Sun size={16} /> 필요 일조량</span>
-                                <span className="text-emerald-600">최소 4시간 ~ 6시간</span>
+                            <div className="flex justify-between items-center text-sm font-bold text-emerald-900/60">
+                                <span className="flex items-center gap-2"><Sun size={16} className="text-amber-500" /> 필요 일조량</span>
+                                <span className="text-emerald-700">4~6시간</span>
                             </div>
-                            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <div className="h-2 bg-emerald-100/50 rounded-full overflow-hidden">
                                 <motion.div initial={{ width: 0 }} animate={{ width: "80%" }} className="h-full bg-amber-400" />
                             </div>
                         </div>
                     </Card>
-                    <Card className="rounded-3xl border-none shadow-sm bg-white p-5">
+                    <Card className="rounded-[2rem] border-none shadow-sm bg-white/70 backdrop-blur-md p-6">
                         <div className="space-y-4">
-                            <div className="flex justify-between items-center text-sm font-bold text-slate-500">
-                                <span className="flex items-center gap-2"><Droplets size={16} /> 선호 습도</span>
-                                <span className="text-blue-600">40% ~ 70%</span>
+                            <div className="flex justify-between items-center text-sm font-bold text-emerald-900/60">
+                                <span className="flex items-center gap-2"><Droplets size={16} className="text-blue-500" /> 선호 습도</span>
+                                <span className="text-blue-700">40%~70%</span>
                             </div>
-                            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <div className="h-2 bg-emerald-100/50 rounded-full overflow-hidden">
                                 <motion.div initial={{ width: 0 }} animate={{ width: "60%" }} className="h-full bg-blue-400" />
                             </div>
                         </div>
                     </Card>
                 </div>
 
-                {/* 3. 성장 타임라인: 시각적 흐름 */}
-                <div className="bg-emerald-900 rounded-[2.5rem] p-8 text-white">
+                {/* 3. 성장 타임라인 */}
+                <div className="bg-emerald-900 shadow-xl shadow-emerald-900/20 rounded-[2.5rem] p-8 text-white">
                     <h3 className="text-lg font-black mb-6 flex items-center gap-2">
                         <Sparkles size={20} className="text-emerald-400" /> 바질의 성장 일기
                     </h3>
@@ -108,12 +114,14 @@ export function GuideView() {
                 </div>
 
                 {/* 4. 인터랙티브 탭 메뉴 */}
-                <div className="flex bg-white p-2 rounded-2xl shadow-sm gap-1 overflow-x-auto no-scrollbar">
+                <div className="flex bg-white/50 backdrop-blur-md p-2 rounded-2xl shadow-sm gap-1 overflow-x-auto no-scrollbar border border-white/60">
                     {BASIL_GUIDE.sections.map((s) => (
                         <button
                             key={s.id}
                             onClick={() => setActiveTab(s.id)}
-                            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${activeTab === s.id ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' : 'text-slate-400 hover:bg-slate-50'
+                            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-black text-sm transition-all whitespace-nowrap ${activeTab === s.id
+                                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200'
+                                : 'text-emerald-800/40 hover:bg-white/50'
                                 }`}
                         >
                             <s.icon size={16} /> {s.label}
@@ -121,13 +129,13 @@ export function GuideView() {
                     ))}
                 </div>
 
-                {/* 5. 탭별 상세 내용 (애니메이션 적용) */}
-                <AnPresence mode="wait">
+                {/* 5. 탭별 상세 내용 */}
+                <AnimatePresence mode="wait">
                     <motion.div
                         key={activeTab}
-                        initial={{ opacity: 0, x: 10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -10 }}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
                         className="space-y-4"
                     >
                         {activeTab === 'care' && (
@@ -309,22 +317,22 @@ export function GuideView() {
                             </div>
                         )}
                     </motion.div>
-                </AnPresence>
+                </AnimatePresence>
             </div>
         </div>
     );
 }
 
-// 헬퍼 컴포넌트: 팁 카드
+// 헬퍼 컴포넌트: 배경색에 어울리도록 bg-white/80 처리
 function TipCard({ title, desc, icon: Icon, color }: any) {
     return (
-        <Card className="border-none shadow-sm p-6 flex gap-5 items-start bg-white rounded-[2rem] group hover:shadow-md transition-all">
+        <Card className="border-none shadow-sm p-6 flex gap-5 items-start bg-white/80 backdrop-blur-md rounded-[2.5rem] group hover:shadow-md transition-all">
             <div className={`p-4 rounded-2xl ${color} shrink-0 transition-transform group-hover:scale-110`}>
                 <Icon size={24} />
             </div>
             <div className="space-y-1">
-                <h4 className="font-black text-slate-800 text-lg">{title}</h4>
-                <p className="text-sm text-slate-500 leading-relaxed font-medium">{desc}</p>
+                <h4 className="font-black text-emerald-950 text-lg">{title}</h4>
+                <p className="text-sm text-emerald-800/60 leading-relaxed font-medium">{desc}</p>
             </div>
         </Card>
     );

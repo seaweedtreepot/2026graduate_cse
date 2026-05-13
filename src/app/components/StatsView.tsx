@@ -81,24 +81,36 @@ export function StatsView({ setError }: StatsViewProps) {
             <div className="absolute bottom-0 left-0 w-96 h-96 bg-teal-200/20 rounded-full blur-3xl -z-10" />
 
             <div className="max-w-6xl mx-auto space-y-8 relative z-10">
-                {/* 헤더 섹션 */}
-                <motion.div
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex flex-col gap-2"
-                >
-                    <div className="flex items-center gap-3">
-                        <div className="p-3 bg-emerald-600 text-white rounded-2xl shadow-lg shadow-emerald-200">
-                            <Library size={28} />
+                {/* 🎯 [개선] 중앙 정렬된 데이터 도서관 헤더 */}
+                <header className="pt-6 pb-4 flex flex-col items-center text-center">
+                    <motion.div
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex flex-col items-center"
+                    >
+                        {/* 상단 아이콘 박스: 더 둥글고 임팩트 있게 */}
+                        <div className="p-4 bg-emerald-600 text-white rounded-[2rem] shadow-xl shadow-emerald-200/50 mb-6 group hover:scale-110 transition-transform duration-500">
+                            <Library size={32} className="group-hover:rotate-12 transition-transform" />
                         </div>
-                        <div>
-                            <h2 className="text-3xl font-black text-emerald-900 tracking-tight">데이터 수치 도서관</h2>
-                            <p className="text-emerald-700/60 font-bold flex items-center gap-1.5">
-                                <Activity size={14} /> 식물의 성장 패턴을 분석하고 기록합니다
+
+                        {/* 타이틀 영역 */}
+                        <div className="space-y-2">
+                            <div className="flex flex-col items-center">
+                                <h2 className="text-4xl font-black text-emerald-900 tracking-tighter leading-tight">
+                                    데이터 수치 도서관
+                                </h2>
+                                {/* 장식용 밑선 (은은하게) */}
+                                <div className="w-12 h-1.5 bg-emerald-500/20 rounded-full mt-1" />
+                            </div>
+
+                            {/* 서브 설명: 중앙 정렬 최적화 */}
+                            <p className="text-emerald-700/60 font-bold flex items-center justify-center gap-1.5 text-sm mt-2">
+                                <Activity size={14} className="text-emerald-500" />
+                                식물의 성장 패턴을 분석하고 기록합니다
                             </p>
                         </div>
-                    </div>
-                </motion.div>
+                    </motion.div>
+                </header>
 
                 {/* 센서 타입 필터 그리드 */}
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
