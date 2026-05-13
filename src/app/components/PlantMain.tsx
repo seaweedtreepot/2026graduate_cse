@@ -53,9 +53,9 @@ export function PlantMain() {
 
             <Sidebar isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} setActiveTab={setActiveTab} activeTab={activeTab} />
 
-            <main className="relative w-full h-full">
-                {/* ✅ 내부 뷰들도 상단 노치에 가려지지 않게 패딩 추가 권장 */}
-                <div className="pt-[env(safe-area-inset-top)]">
+            <main className="relative w-full"> {/* 🎯 h-full 제거! */}
+                <div className={`pt-[env(safe-area-inset-top)] ${(activeTab === 'status' || activeTab === 'guide') ? 'bg-transparent' : 'bg-white'
+                    }`}>
                     {activeTab === 'status' && <StatusView setError={setIsGlobalError} />}
                     {activeTab === 'stats' && <StatsView setError={setIsGlobalError} />}
                     {activeTab === 'guide' && <GuideView />}

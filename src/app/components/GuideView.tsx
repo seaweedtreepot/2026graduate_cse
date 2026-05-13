@@ -36,10 +36,11 @@ export function GuideView() {
         /* 🎨 배경: 기존과 동일한 그라데이션 및 relative 설정 */
         <div className="min-h-[100dvh] w-full bg-gradient-to-br from-green-50 via-emerald-50 to-teal-100 p-4 md:p-8 pb-32 relative overflow-x-hidden">
 
-            {/* ✨ [기존 유지] 배경 장식용 블러 원형 */}
-            <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-green-200/20 rounded-full blur-3xl -z-10" />
-            <div className="absolute bottom-[-10%] left-[-10%] w-96 h-96 bg-emerald-200/20 rounded-full blur-3xl -z-10" />
+            {/* ✨ 🎯 수정: -z-10을 z-0으로 변경하여 부모 배경보다 위로 올림 */}
+            <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-green-200/20 rounded-full blur-3xl z-0" />
+            <div className="absolute bottom-[-10%] left-[-10%] w-96 h-96 bg-emerald-200/20 rounded-full blur-3xl z-0" />
 
+            {/* ✨ 🎯 수정: 컨텐츠를 z-10으로 감싸서 장식보다 위로 올림 */}
             <div className="max-w-2xl mx-auto space-y-6 relative z-10">
 
                 {/* 1. 히어로 섹션 */}
