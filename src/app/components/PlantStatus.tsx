@@ -2,6 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Droplets, Sun, Sprout, Bug, AlertTriangle, CheckCircle2, AlertCircle, Leaf, Video, X, Thermometer } from 'lucide-react';
 import { useSearchParams } from 'react-router';
 import { useState, useEffect } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
 import { ImageWithFallback } from './figma/ImageWithFallback';
@@ -13,6 +14,8 @@ interface StatusIndicator {
   icon: React.ElementType;
   label: string;
   value: 'good' | 'warning' | 'critical';
+  currentValue: number | string; // 추가: 실측 숫자
+  unit: string;                  // 추가: 단위 (%, lux 등)
 }
 
 
@@ -39,16 +42,21 @@ export function StatusView({ setError }: StatusViewProps) {
   const plantName = searchParams.get('plant') || '바질';
   const [showCamera, setShowCamera] = useState(false);
   const [selectedAction, setSelectedAction] = useState<string | null>(null);
-  const [isBlowing, setIsBlowing] = useState(false);
-  const [bugsBlownAway, setBugsBlownAway] = useState(false);
-  const [showBlowHint, setShowBlowHint] = useState(false);
-  const [isWatering, setIsWatering] = useState(false);
-  const [wateringComplete, setWateringComplete] = useState(false);
-  const [recentlySolved, setRecentlySolved] = useState<string | null>(null);
   const [streamUrl, setStreamUrl] = useState<string>(''); // 스트리밍 주소 저장
   const [isCapturing, setIsCapturing] = useState(false); // 캡처 로딩 상태
   const [lastUpdated, setLastUpdated] = useState<string>(''); // 마지막 동기화 시간
+  const [isLighting, setIsLighting] = useState(false); // 빛 쐬기 애니메이션용
+  const [lightComplete, setLightComplete] = useState(false); // 완료 표시용
 
+  // [추가] 실시간 센서 데이터를 담을 상태 변수입니다.
+  const [statusData, setStatusData] = useState<StatusIndicator[]>([
+    { icon: Droplets, label: '습도', value: 'good', currentValue: 0, unit: '%' },
+    { icon: Thermometer, label: '온도', value: 'good', currentValue: 0, unit: '°C' },
+    { icon: Sun, label: '조도', value: 'good', currentValue: 0, unit: 'lux' },
+    { icon: Sprout, label: '흙의 상태', value: 'good', currentValue: 0, unit: '%' },
+    { icon: Bug, label: '벌레', value: 'good', currentValue: 0, unit: '마리' },
+    { icon: AlertTriangle, label: '질병', value: 'good', currentValue: '정상', unit: '' },
+  ]);
 
   // 3. [추가] 서버의 숫자 데이터를 'good' 등으로 변환해주는 도구 (함수)
   const determineStatus = (label: string, value: number): 'good' | 'warning' | 'critical' => {
@@ -79,44 +87,76 @@ export function StatusView({ setError }: StatusViewProps) {
   ];
 
   const fetchStatus = async () => {
+    if (!plantId) return; // plantId가 없으면 실행 안 함
+
     try {
-      // 1. 주소 수정: /api/v1과 /status 확인!
+      // 1. 백엔드 API 호출
       const res = await api.get(`/plants/${plantId}/status`);
       const data = res.data;
       console.log("🚀 백엔드에서 도착한 데이터:", data);
 
-      // 2. 서버에서 준 level이 있다면 업데이트
+      // 2. 서버에서 준 레벨이 있다면 즉시 업데이트
       if (data.level) {
         setCurrentLevel(data.level);
       }
 
-      // 3. 백엔드의 temp, humidity를 프론트의 습도, 온도 칸에 매핑
+      // 3. [핵심] 중복 선언을 없애고, 실측값(currentValue)과 상태(value)를 한 번에 매핑
       const updatedData: StatusIndicator[] = [
         {
           icon: Droplets,
           label: '습도',
-          value: determineStatus('습도', data.humidity) // data.moisture 대신 data.humidity
+          currentValue: data.humidity || 0,
+          unit: '%',
+          value: determineStatus('습도', data.humidity || 0)
         },
         {
           icon: Thermometer,
           label: '온도',
-          value: determineStatus('온도', data.temp) // data.temperature 대신 data.temp
+          currentValue: data.temp || 0,
+          unit: '°C',
+          value: determineStatus('온도', data.temp || 0)
         },
-        // 나머지는 아직 백엔드에 없으므로 기본값(good) 처리
-        { icon: Sun, label: '조도', value: 'good' },
-        { icon: Sprout, label: '흙의 상태', value: 'good' },
-        { icon: Bug, label: '벌레', value: 'good' },
-        { icon: AlertTriangle, label: '질병', value: 'good' },
+        {
+          icon: Sun,
+          label: '조도',
+          currentValue: data.light || 0,
+          unit: 'lux',
+          value: determineStatus('조도', data.light || 0)
+        },
+        {
+          icon: Sprout,
+          label: '흙의 상태',
+          currentValue: data.soil || 0,
+          unit: '%',
+          value: 'good' // 필요 시 determineStatus 추가
+        },
+        {
+          icon: Bug,
+          label: '벌레',
+          currentValue: data.bugs || 0,
+          unit: '마리',
+          value: determineStatus('벌레', data.bugs || 0)
+        },
+        {
+          icon: AlertTriangle,
+          label: '질병',
+          currentValue: data.disease > 0 ? '위험' : '정상',
+          unit: '',
+          value: determineStatus('질병', data.disease || 0)
+        },
       ];
 
+      // 4. 상태 저장
       setStatusData(updatedData);
       setLastUpdated(new Date().toLocaleTimeString('ko-KR'));
       setError(false);
+
     } catch (err) {
       console.error("데이터 호출 실패:", err);
       setError(true);
     }
   };
+
   // 마우스 위치 추적
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
@@ -165,38 +205,7 @@ export function StatusView({ setError }: StatusViewProps) {
   }, [showCamera, plantId]);
 
   // 실제로는 기기에서 받아온 데이터를 사용
-  const [statusData, setStatusData] = useState<StatusIndicator[]>([
-    {
-      icon: Droplets,
-      label: '습도',
-      value: 'good',
-    },
-    {
-      icon: Sun,
-      label: '조도',
-      value: 'warning',
-    },
-    {
-      icon: Sprout,
-      label: '흙의 상태',
-      value: 'critical',
-    },
-    {
-      icon: Bug,
-      label: '벌레',
-      value: 'good',
-    },
-    {
-      icon: Thermometer,
-      label: '온도',
-      value: 'good',
-    },
-    {
-      icon: AlertTriangle,
-      label: '질병',
-      value: 'good',
-    },
-  ]);
+
 
   // 시뮬레이션: 주기적으로 상태 업데이트
   // PlantStatus.tsx 내부의 기존 useEffect를 아래로 교체
@@ -238,8 +247,8 @@ export function StatusView({ setError }: StatusViewProps) {
   };
 
   const getOverallStatus = () => {
-    const criticalCount = statusData.filter(s => s.value === 'critical').length;
-    const warningCount = statusData.filter(s => s.value === 'warning').length;
+    const criticalCount = statusData.filter((s: StatusIndicator) => s.value === 'critical').length;
+    const warningCount = statusData.filter((s: StatusIndicator) => s.value === 'warning').length;
 
     if (criticalCount > 0) {
       return {
@@ -271,76 +280,15 @@ export function StatusView({ setError }: StatusViewProps) {
   const overall = getOverallStatus();
 
   // 각 팩터별 상태 가져오기
-  const humidityStatus = statusData.find(s => s.label === '습도');
-  const lightStatus = statusData.find(s => s.label === '조도');
-  const soilStatus = statusData.find(s => s.label === '흙의 상태');
-  const bugStatus = statusData.find(s => s.label === '벌레');
-  const tempStatus = statusData.find(s => s.label === '온도');
-  const diseaseStatus = statusData.find(s => s.label === '질병');
+  const humidityStatus = statusData.find((s: StatusIndicator) => s.label === '습도');
+  const lightStatus = statusData.find((s: StatusIndicator) => s.label === '조도');
+  const soilStatus = statusData.find((s: StatusIndicator) => s.label === '흙의 상태');
+  const bugStatus = statusData.find((s: StatusIndicator) => s.label === '벌레');
+  const tempStatus = statusData.find((s: StatusIndicator) => s.label === '온도');
+  const diseaseStatus = statusData.find((s: StatusIndicator) => s.label === '질병');
 
   // 배경 스타일 결정
   const getBackgroundStyle = () => {
-    // 우선순위: 벌레 > 질병 > 습도 > 조도 > 온도 > 기본
-
-    // if (bugStatus?.value === 'critical' || bugStatus?.value === 'warning') {
-    //   return {
-    //     gradient: 'from-gray-700 via-gray-600 to-gray-500',
-    //     overlay: 'rgba(0, 0, 0, 0.3)',
-    //     description: 'bugs',
-    //   };
-    // }
-
-    // if (diseaseStatus?.value === 'critical') {
-    //   return {
-    //     gradient: 'from-purple-900 via-purple-700 to-purple-600',
-    //     overlay: 'rgba(139, 92, 246, 0.2)',
-    //     description: 'disease',
-    //   };
-    // }
-
-    // if (humidityStatus?.value === 'critical') {
-    //   // 사막
-    //   return {
-    //     gradient: 'from-yellow-400 via-orange-300 to-amber-400',
-    //     overlay: 'rgba(251, 191, 36, 0.3)',
-    //     description: 'desert',
-    //   };
-    // }
-
-    // if (humidityStatus?.value === 'warning') {
-    //   // 홍수/비
-    //   return {
-    //     gradient: 'from-blue-400 via-blue-300 to-cyan-300',
-    //     overlay: 'rgba(59, 130, 246, 0.3)',
-    //     description: 'flood',
-    //   };
-    // }
-
-    // if (lightStatus?.value === 'critical') {
-    //   // 어두움
-    //   return {
-    //     gradient: 'from-slate-700 via-slate-600 to-gray-600',
-    //     overlay: 'rgba(0, 0, 0, 0.5)',
-    //     description: 'dark',
-    //   };
-    // }
-
-    // if (lightStatus?.value === 'warning') {
-    //   // 뜨거운 태양
-    //   return {
-    //     gradient: 'from-red-400 via-orange-400 to-yellow-400',
-    //     overlay: 'rgba(239, 68, 68, 0.3)',
-    //     description: 'hot',
-    //   };
-    // }
-
-    // if (tempStatus?.value === 'critical') {
-    //   return {
-    //     gradient: 'from-blue-900 via-indigo-800 to-blue-700',
-    //     overlay: 'rgba(29, 78, 216, 0.3)',
-    //     description: 'cold',
-    //   };
-    // }
 
     // 건강한 상태
     return {
@@ -352,87 +300,29 @@ export function StatusView({ setError }: StatusViewProps) {
 
   const backgroundStyle = getBackgroundStyle();
 
-  const handleActionClick = async (actionType: string) => {
-    if (!plantId) {
-      alert("식물 ID가 없어 제어할 수 없습니다.");
-      return;
-    }
+  const handleLightToggle = async () => {
+    if (!plantId) return;
 
-    if (actionType === 'humidity') {
-      console.log('💧 물주기 명령 전송 시작');
-      setIsWatering(true); // 애니메이션 시작
-      setSelectedAction(null);
+    // 다음 상태 결정 (켜져 있으면 끄기, 꺼져 있으면 켜기)
+    const nextStatus = isLighting ? "off" : "on";
 
-      try {
-        // 1. 실제 물주기 API 호출 (명세서 기준)
-        const response = await api.post(`/plants/${plantId}/control/water`, {
-          amount: 50 // 보낼 양 (서버와 협의된 값)
-        });
+    try {
+      // 백엔드에 현재 필요한 상태 전송
+      const res = await api.post(`/plants/${plantId}/control/light`, {
+        status: nextStatus
+      });
 
-        if (response.data.status === 'success' || response.status === 200) {
-          console.log('✅ 서버 응답:', response.data.message);
-
-          // 3초 후 애니메이션 종료 및 결과 반영 (기존 로직 유지)
-          setTimeout(() => {
-            setIsWatering(false);
-            setWateringComplete(true);
-            setRecentlySolved('humidity');
-
-            // 센서 상태를 강제로 'good'으로 업데이트 (서버에서 다시 읽어오기 전까지 UI 유지)
-            setStatusData(prev => prev.map(status =>
-              (status.label === '습도' || status.label === '흙의 상태')
-                ? { ...status, value: 'good' } : status
-            ));
-
-            setTimeout(() => {
-              setWateringComplete(false);
-              setRecentlySolved(null);
-            }, 3000);
-          }, 3000);
-        }
-      } catch (err) {
-        console.error('❌ 물주기 실패:', err);
-        alert('기기와 연결이 원활하지 않아 물을 줄 수 없습니다.');
-        setIsWatering(false);
+      if (res.status === 200) {
+        // 성공 시 프론트엔드 상태 변경
+        setIsLighting(!isLighting);
+        fetchStatus(); // 상태 변경 후 최신 센서 데이터 확인
       }
-
-    } else if (actionType === 'bug') {
-      console.log('💨 바람불기 명령 전송 시작');
-      setIsBlowing(true); // 바람 애니메이션 시작
-      setSelectedAction(null);
-
-      try {
-        // 2. 실제 바람 제어 API 호출 (명세서 기준)
-        const response = await api.post(`/plants/${plantId}/control/wind`, {
-          duration: 3000 // 바람 부는 시간 (ms)
-        });
-
-        if (response.data.status === 'success' || response.status === 200) {
-          console.log('✅ 서버 응답:', response.data.message);
-
-          // 1.5초 후 벌레 사라지는 연출
-          setTimeout(() => {
-            setIsBlowing(false);
-            setBugsBlownAway(true);
-            setRecentlySolved('bug');
-
-            setStatusData(prev => prev.map(status =>
-              status.label === '벌레' ? { ...status, value: 'good' } : status
-            ));
-
-            setTimeout(() => {
-              setRecentlySolved(null);
-              setBugsBlownAway(false);
-            }, 3000);
-          }, 1500);
-        }
-      } catch (err) {
-        console.error('❌ 바람불기 실패:', err);
-        alert('바람 제어 명령을 전달하지 못했습니다.');
-        setIsBlowing(false);
-      }
+    } catch (err) {
+      console.error("제어 실패:", err);
+      alert(`햇빛을 ${nextStatus === 'on' ? '켜는' : '끄는'} 데 실패했습니다.`);
     }
   };
+
 
   const handleCapture = async () => {
     if (!plantId) return;
@@ -460,10 +350,7 @@ export function StatusView({ setError }: StatusViewProps) {
     let color = 'text-green-600';
 
     // 상태에 따른 mood 결정
-    if (wateringComplete || recentlySolved === 'humidity') {
-      mood = 'watered';
-      scale = 1.15;
-    } else if (diseaseStatus?.value === 'critical') {
+    if (diseaseStatus?.value === 'critical') {
       mood = 'sick';
       scale = 0.85;
       rotation = -10;
@@ -550,209 +437,33 @@ export function StatusView({ setError }: StatusViewProps) {
             ease: 'easeInOut',
           }}
         />
-
-        {/* 배경별 특수 효과 */}
-        {backgroundStyle.description === 'desert' && (
-          <>
-            {/* 사막 모래 언덕 */}
-            <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-yellow-700/40 to-transparent">
-              <div className="absolute bottom-0 left-0 right-0 h-20">
-                {[...Array(10)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="absolute bottom-0 bg-yellow-600/30 rounded-t-full"
-                    style={{
-                      left: `${i * 10}%`,
-                      width: `${8 + Math.random() * 4}%`,
-                      height: `${40 + Math.random() * 30}px`,
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-            {/* 갈라진 땅 효과 */}
-            <div className="absolute bottom-20 left-1/4 w-32 h-1 bg-amber-900/50" />
-            <div className="absolute bottom-24 right-1/3 w-24 h-1 bg-amber-900/50 rotate-45" />
-          </>
-        )}
-
-        {backgroundStyle.description === 'flood' && (
-          <>
-            {/* 빗방울 효과 */}
-            {[...Array(20)].map((_, i) => (
-              <motion.div
-                key={i}
-                className="absolute w-0.5 h-8 bg-blue-400/60"
-                initial={{
-                  x: Math.random() * window.innerWidth,
-                  y: -50
-                }}
-                animate={{
-                  y: window.innerHeight + 50,
-                }}
-                transition={{
-                  duration: 1 + Math.random() * 0.5,
-                  repeat: Infinity,
-                  delay: i * 0.1,
-                  ease: 'linear',
-                }}
-              />
-            ))}
-            {/* 물 웅덩이 */}
-            <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-blue-600/40 to-transparent">
-              <motion.div
-                className="absolute bottom-0 left-0 right-0 h-4 bg-blue-500/50"
-                animate={{
-                  height: ['16px', '20px', '16px'],
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                }}
-              />
-            </div>
-          </>
-        )}
-
-        {backgroundStyle.description === 'dark' && (
-          <>
-            {/* 어두운 구름 */}
-            <div className="absolute top-0 left-0 right-0">
-              {[...Array(5)].map((_, i) => (
-                <motion.div
-                  key={i}
-                  className="absolute bg-gray-800/40 rounded-full blur-2xl"
-                  style={{
-                    left: `${i * 20}%`,
-                    top: `${Math.random() * 30}%`,
-                    width: `${100 + Math.random() * 100}px`,
-                    height: `${60 + Math.random() * 40}px`,
-                  }}
-                  animate={{
-                    x: [0, 20, 0],
-                    opacity: [0.3, 0.5, 0.3],
-                  }}
-                  transition={{
-                    duration: 5 + i,
-                    repeat: Infinity,
-                  }}
-                />
-              ))}
-            </div>
-          </>
-        )}
-
-        {backgroundStyle.description === 'hot' && (
-          <>
-            {/* 뜨거운 태양 */}
+        {/* [추가] 은은한 햇살 효과 레이어 */}
+        <AnimatePresence>
+          {isLighting && (
             <motion.div
-              className="absolute top-10 right-10 w-24 h-24 bg-yellow-300 rounded-full blur-xl"
-              animate={{
-                scale: [1, 1.2, 1],
-                opacity: [0.8, 1, 0.8],
-              }}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-              }}
-            />
-            {/* 아지랑이 효과 */}
-            {[...Array(8)].map((_, i) => (
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-0" // 배경 그라데이션 바로 위
+            >
+              {/* 전체적인 따뜻한 톤 입히기 */}
+              <div className="absolute inset-0 bg-yellow-300/10 mix-blend-soft-light" />
+
+              {/* 중앙에서 은은하게 퍼지는 광원 (Radial Glow) */}
               <motion.div
-                key={i}
-                className="absolute bottom-20 bg-orange-400/20 blur-md"
-                style={{
-                  left: `${i * 12}%`,
-                  width: '60px',
-                  height: '80px',
-                }}
                 animate={{
-                  y: [0, -20, 0],
-                  opacity: [0.2, 0.4, 0.2],
+                  scale: [1, 1.1, 1],
+                  opacity: [0.3, 0.5, 0.3],
                 }}
-                transition={{
-                  duration: 2 + Math.random(),
-                  repeat: Infinity,
-                  delay: i * 0.2,
-                }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full bg-yellow-200/20 blur-[120px]"
               />
-            ))}
-            {/* 갈라진 땅 */}
-            <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-red-900/30 to-transparent">
-              {[...Array(6)].map((_, i) => (
-                <div
-                  key={i}
-                  className="absolute bottom-0 h-1 bg-red-950/60"
-                  style={{
-                    left: `${i * 16}%`,
-                    width: `${10 + Math.random() * 5}%`,
-                    transform: `rotate(${-10 + Math.random() * 20}deg)`,
-                  }}
-                />
-              ))}
-            </div>
-          </>
-        )}
 
-        {backgroundStyle.description === 'cold' && (
-          <>
-            {/* 눈송이 효과 */}
-            {[...Array(15)].map((_, i) => (
-              <motion.div
-                key={i}
-                className="absolute text-2xl"
-                initial={{
-                  x: Math.random() * window.innerWidth,
-                  y: -50,
-                  rotate: 0
-                }}
-                animate={{
-                  y: window.innerHeight + 50,
-                  rotate: 360,
-                  x: Math.random() * window.innerWidth - 50,
-                }}
-                transition={{
-                  duration: 8 + Math.random() * 5,
-                  repeat: Infinity,
-                  delay: i * 0.5,
-                  ease: 'linear',
-                }}
-              >
-                ❄️
-              </motion.div>
-            ))}
-          </>
-        )}
-
-        {backgroundStyle.description === 'disease' && (
-          <>
-            {/* 병든 잎사귀와 어두운 분위기 */}
-            {[...Array(8)].map((_, i) => (
-              <motion.div
-                key={i}
-                className="absolute text-2xl opacity-60"
-                initial={{
-                  x: Math.random() * window.innerWidth,
-                  y: -50,
-                  rotate: 0
-                }}
-                animate={{
-                  y: window.innerHeight + 50,
-                  rotate: 360,
-                  x: Math.random() * window.innerWidth,
-                }}
-                transition={{
-                  duration: 12 + Math.random() * 8,
-                  repeat: Infinity,
-                  delay: i * 1.5,
-                  ease: 'linear',
-                }}
-              >
-                🍂
-              </motion.div>
-            ))}
-          </>
-        )}
+              {/* 아주 작고 투명한 해 아이콘 (선택 사항, 은은하게) */}
+              <div className="absolute top-20 right-20 text-6xl opacity-10 filter blur-sm">☀️</div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {backgroundStyle.description === 'healthy' && (
           <>
@@ -799,246 +510,16 @@ export function StatusView({ setError }: StatusViewProps) {
       </motion.div>
 
 
-
-      {/* [추가] 애니메이션 전용 레이어: 캐릭터(z-30)보다 높은 z-50 설정 */}
-      <div className="fixed inset-0 pointer-events-none z-50">
-        {/* 바람 효과 */}
-        {isBlowing && (
-          <>
-            {[...Array(15)].map((_, i) => (
-              <motion.div
-                key={`wind-${i}`}
-                className="absolute text-4xl z-20"
-                initial={{
-                  x: -50,
-                  y: window.innerHeight * (0.2 + Math.random() * 0.4),
-                  opacity: 0.8,
-                }}
-                animate={{
-                  x: window.innerWidth + 50,
-                  opacity: 0,
-                }}
-                transition={{
-                  duration: 1.5,
-                  delay: i * 0.05,
-                  ease: 'easeOut',
-                }}
-              >
-                💨
-              </motion.div>
-            ))}
-          </>
-        )}
-
-        {/* 물주기 애니메이션 */}
-        {isWatering && (
-          <>
-            {/* 물방울들 */}
-            {[...Array(30)].map((_, i) => (
-              <motion.div
-                key={`water-${i}`}
-                className="absolute text-3xl z-50"
-                initial={{
-                  x: window.innerWidth / 2 - 50 + Math.random() * 100,
-                  y: -50,
-                  rotate: 0,
-                  scale: 0.5 + Math.random() * 0.5,
-                }}
-                animate={{
-                  y: window.innerHeight * 0.5,
-                  rotate: 360,
-                  scale: 0,
-                }}
-                transition={{
-                  duration: 1.5 + Math.random() * 0.5,
-                  delay: i * 0.05,
-                  ease: 'easeIn',
-                }}
-              >
-                💧
-              </motion.div>
-            ))}
-
-            {/* 물뿌리개 */}
-            <motion.div
-              className="absolute text-7xl z-30"
-              initial={{
-                x: window.innerWidth / 2 - 100,
-                y: -100,
-                rotate: -45,
-              }}
-              animate={{
-                x: window.innerWidth / 2 - 50,
-                y: 50,
-                rotate: 0,
-              }}
-              transition={{
-                duration: 0.8,
-                ease: 'easeOut',
-              }}
-            >
-              🚿
-            </motion.div>
-
-            {/* 물주는 중 메시지 */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-blue-500 text-white px-6 py-4 rounded-full shadow-2xl z-50 flex items-center gap-3"
-            >
-              <motion.span
-                className="text-3xl"
-                animate={{
-                  rotate: [0, -20, 20, -20, 20, 0],
-                }}
-                transition={{
-                  duration: 1.5,
-                  repeat: Infinity,
-                }}
-              >
-                💧
-              </motion.span>
-              <div>
-                <p className="font-bold">물주는 중...</p>
-                <p className="text-sm opacity-90">기기가 작동하고 있습니다</p>
-              </div>
-            </motion.div>
-          </>
-        )}
-
-        {/* 물주기 완료 효과 */}
-        {wateringComplete && (
-          <>
-            {/* 반짝이는 효과 */}
-            {[...Array(12)].map((_, i) => (
-              <motion.div
-                key={`sparkle-${i}`}
-                className="absolute text-3xl z-30"
-                initial={{
-                  x: window.innerWidth / 2,
-                  y: window.innerHeight * 0.35,
-                  scale: 0,
-                }}
-                animate={{
-                  x: window.innerWidth / 2 + Math.cos((i / 12) * Math.PI * 2) * 150,
-                  y: window.innerHeight * 0.35 + Math.sin((i / 12) * Math.PI * 2) * 150,
-                  scale: [0, 1.5, 0],
-                  rotate: 360,
-                }}
-                transition={{
-                  duration: 1.5,
-                  ease: 'easeOut',
-                }}
-              >
-                ✨
-              </motion.div>
-            ))}
-
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-6 py-4 rounded-full shadow-2xl z-50 flex items-center gap-3"
-            >
-              <span className="text-3xl">🎉</span>
-              <div>
-                <p className="font-bold">물주기 완료!</p>
-                <p className="text-sm opacity-90">식물이 기뻐해요!</p>
-              </div>
-            </motion.div>
-          </>
-        )}
-
-      </div>
+      {/*캐릭터*/}
       <div className="relative z-10 w-full max-w-4xl mx-auto p-6 space-y-6">
-        {/* 바람 불기 힌트 */}
-        {showBlowHint && !bugsBlownAway && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-6 py-4 rounded-full shadow-2xl z-50 flex items-center gap-3"
-          >
-            <motion.span
-              className="text-3xl"
-              animate={{
-                scale: [1, 1.3, 1],
-              }}
-              transition={{
-                duration: 1.5,
-                repeat: Infinity,
-              }}
-            >
-              💨
-            </motion.span>
-            <div>
-              <p className="font-bold">마이크에 바람을 불어보세요!</p>
-              <p className="text-sm opacity-90">벌레들을 날려버릴 수 있어요</p>
-            </div>
-          </motion.div>
-        )}
-
-        {/* 바람 불고 있음 표시 */}
-        {isBlowing && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-cyan-500 text-white px-6 py-3 rounded-full shadow-2xl z-50 font-bold"
-          >
-            🌬️ 바람 불고 있어요!
-          </motion.div>
-        )}
-
-        {/* 캐릭터 영역 */}
         <motion.div
-          className="h-[40vh] flex flex-col items-center justify-center relative"
+          className="h-[45vh] flex flex-col items-center justify-start pt-10 relative" // justify-center 대신 justify-start + pt-10 사용
           animate={{
             scale: characterMood.scale,
             rotate: characterMood.rotation,
           }}
           transition={{ duration: 0.5 }}
         >
-          {/* 벌레 레이어: 부모의 정중앙에 고정 */}
-          {(bugStatus?.value === 'critical' || bugStatus?.value === 'warning') && !bugsBlownAway && (
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none w-full h-full flex items-center justify-center">
-              {[...Array(12)].map((_, i) => (
-                <motion.div
-                  key={`bug-${i}`}
-                  className="absolute text-3xl z-40" // 캐릭터(z-30)보다 위
-                  initial={{
-                    x: (Math.random() - 0.5) * 100, // 시작 시점부터 캐릭터 주변에 분산
-                    y: (Math.random() - 0.5) * 100,
-                  }}
-                  animate={
-                    isBlowing
-                      ? {
-                        x: window.innerWidth, // 바람 불면 화면 오른쪽으로 퇴장
-                        opacity: 0,
-                      }
-                      : {
-                        // 캐릭터 중심(0, 0)을 기준으로 무작위 비행
-                        x: [
-                          (Math.random() - 0.5) * 250,
-                          (Math.random() - 0.5) * 250,
-                          (Math.random() - 0.5) * 250
-                        ],
-                        y: [
-                          (Math.random() - 0.5) * 250,
-                          (Math.random() - 0.5) * 250,
-                          (Math.random() - 0.5) * 250
-                        ],
-                      }
-                  }
-                  transition={{
-                    duration: isBlowing ? 0.8 : 3 + Math.random() * 2,
-                    repeat: isBlowing ? 0 : Infinity,
-                    ease: "easeInOut",
-                  }}
-                >
-                  {i % 3 === 0 ? '🦟' : i % 3 === 1 ? '🪰' : '🐛'}
-                </motion.div>
-              ))}
-            </div>
-          )}
 
           {/* 캐릭터 */}
           <motion.div
@@ -1068,11 +549,10 @@ export function StatusView({ setError }: StatusViewProps) {
               ease: 'easeInOut',
             }}
           >
-            {/* 캐릭터 (이미지로 교체됨) */}
+            {/* 캐릭터 이미지 컨테이너: 마진을 줄여서 버튼과의 간격을 좁힘 */}
             <motion.div
-              className="relative z-30 mb-4"
+              className={`relative z-30 mb-2`} // mb-4에서 mb-2로 줄임
               animate={{
-                // 상태별로 이미지가 조금씩 움직이는 효과
                 y: characterMood.mood === 'suffering' ? [-5, 5, -5] : [0, -10, 0],
                 rotate: characterMood.mood === 'fighting' ? [-15, 15, -15] : [0, 0, 0],
               }}
@@ -1085,33 +565,32 @@ export function StatusView({ setError }: StatusViewProps) {
               <img
                 src={characterMood.imageSrc}
                 alt="반려식물 캐릭터"
-                className="w-120 h-70 object-contain drop-shadow-2xl"
-                // 캐릭터 크기는 w-56 h-56 부분을 조절해서 맞추세요.
+                className="w-100 h-60 object-contain drop-shadow-2xl" // 크기를 소폭 조정해서 비율 최적화
                 onError={(e) => {
-                  // 혹시 이미지가 없을 경우를 대비한 방어 코드 (기본 이미지로 대체)
                   (e.target as HTMLImageElement).src = `/assets/character/lv${currentLevel}_happy.png`;
                 }}
               />
             </motion.div>
           </motion.div>
 
+          {/* 카메라 버튼 */}
           <motion.button
             onClick={() => setShowCamera(true)}
-            className="text-3xl font-bold text-green-800 hover:text-green-600 transition-colors flex items-center gap-3 bg-white/60 backdrop-blur-sm px-6 py-3 rounded-full shadow-lg z-30 relative"
+            className="text-2xl font-bold text-green-800 hover:text-green-600 transition-colors flex items-center gap-3 bg-white/70 backdrop-blur-sm px-5 py-2.5 rounded-full shadow-lg z-30 relative"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
             {plantName}
-            <Video className="size-6" />
+            <Video className="size-5" />
           </motion.button>
 
-          <p className={`text-lg font-medium mt-3 text-center ${characterMood.color} z-30 relative`}>
+          <p className={`text-base font-bold mt-3 text-center ${characterMood.color} z-30 relative bg-white/30 px-4 py-1 rounded-full backdrop-blur-xs`}>
             {characterMood.mood === 'happy' ? '건강하게 자라고 있어요!' :
               characterMood.mood === 'worried' ? '조금 신경써주세요' :
                 characterMood.mood === 'suffering' ? '벌레들이 괴롭혀요!' :
                   characterMood.mood === 'relieved' ? '고마워요! 이제 괜찮아요! 🎉' :
                     characterMood.mood === 'watered' ? '시원해요! 감사합니다! 💙' :
-                      characterMood.mood === 'fighting' ? '벌레들아, 물러가라! 💪' :
+                      characterMood.mood === 'fighting' ? '인공 햇빛 충전 중! ☀️' :
                         characterMood.mood === 'sick' ? '아파요... 도와주세요' :
                           '도움이 필요해요!'}
           </p>
@@ -1179,17 +658,13 @@ export function StatusView({ setError }: StatusViewProps) {
         </motion.div>
         {/* ------------------------- */}
 
-        {/* 상세 지표 */}
+        {/* 상세 지표 그리드 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {statusData.map((status, index) => {
+          {statusData.map((status: StatusIndicator, index: number) => {
             const StatusIcon = status.icon;
             const colors = getStatusColor(status.value);
             const StatusBadgeIcon = colors.icon;
-
-            // 습도와 벌레는 '액션 아이템'으로 분류
-            const isActionItem = status.label === '습도' || status.label === '벌레';
-            const actionType = status.label === '습도' ? 'humidity' : status.label === '벌레' ? 'bug' : 'tip';
-            const displayMessage = getIndicatorMessage(status.label, status.value);
+            const isLightCard = status.label === '조도';
 
             return (
               <motion.div
@@ -1197,58 +672,73 @@ export function StatusView({ setError }: StatusViewProps) {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
-                whileHover={{ scale: 1.02 }}
+                whileHover={{ scale: 1.01 }}
               >
-                <Card className={`border-2 ${colors.border} ${colors.bg} shadow-lg overflow-hidden`}>
+                <Card className={`border-2 ${colors.border} ${colors.bg} shadow-lg overflow-hidden transition-all`}>
                   <CardContent className="pt-6">
-                    {/* 카드 클릭 영역 - 이제 모든 카드가 cursor-pointer 임 */}
+                    {/* 카드 상단: 클릭 시 상세 정보 토글 */}
                     <button
                       onClick={() => setSelectedAction(selectedAction === status.label ? null : status.label)}
-                      className="w-full text-left cursor-pointer"
+                      className="w-full text-left"
                     >
                       <div className="flex items-start gap-4">
                         <div className={`p-3 rounded-full ${colors.iconBg}`}>
                           <StatusIcon className={`size-6 ${colors.text}`} />
                         </div>
                         <div className="flex-1">
-                          <div className="flex items-center justify-between mb-2">
-                            <h3 className="font-semibold text-gray-800">{status.label}</h3>
-                            <StatusBadgeIcon className={`size-5 ${colors.text}`} />
+                          <div className="flex items-center justify-between mb-1">
+                            <h3 className="font-bold text-gray-800">{status.label}</h3>
+                            {/* 실측 수치 표시 */}
+                            <div className="flex items-center gap-2">
+                              <span className={`text-base font-black ${colors.text}`}>
+                                {status.currentValue}{status.unit}
+                              </span>
+                              <StatusBadgeIcon className={`size-4 ${colors.text}`} />
+                            </div>
                           </div>
-                          <p className={`text-sm ${colors.text}`}>
-                            {displayMessage}
+                          <p className={`text-xs font-medium opacity-80 ${colors.text}`}>
+                            {getIndicatorMessage(status.label, status.value)}
                           </p>
                         </div>
                       </div>
                     </button>
 
-                    {/* 클릭 시 열리는 상세 영역 */}
+                    {/* 펼쳐지는 상세 영역 */}
                     {selectedAction === status.label && (
                       <motion.div
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         className="mt-4 pt-4 border-t border-black/5"
                       >
-                        {isActionItem ? (
-                          /* 1. 습도/벌레인 경우: 실행 버튼 표시 */
+                        {isLightCard ? (
+                          /* 조도 카드: 현재 상태에 따라 버튼이 변함 */
                           <Button
-                            onClick={() => handleActionClick(actionType)}
-                            className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg font-bold"
+                            onClick={handleLightToggle}
+                            className={`w-full font-bold h-11 rounded-xl transition-all ${isLighting
+                              ? 'bg-slate-200 hover:bg-slate-300 text-slate-700' // 꺼짐 버튼 스타일
+                              : 'bg-yellow-500 hover:bg-yellow-600 text-white shadow-md' // 켜짐 버튼 스타일
+                              }`}
                           >
-                            {status.label === '습도' ? (
-                              <><Droplets className="size-4 mr-2" /> 물주기 실행</>
+                            {isLighting ? (
+                              <>
+                                <div className="size-4 border-2 border-slate-400 border-t-slate-600 rounded-full animate-spin mr-2" />
+                                인공 햇빛 끄기
+                              </>
                             ) : (
-                              <><Bug className="size-4 mr-2" /> 바람불기 실행</>
+                              <>
+                                <Sun className="size-4 mr-2" />
+                                인공 햇빛 켜기
+                              </>
                             )}
                           </Button>
                         ) : (
-                          /* 2. 그 외 항목인 경우: 맞춤형 가이드 팁 표시 */
-                          <div className="bg-white/40 p-4 rounded-xl border border-white/20 backdrop-blur-sm">
-                            <div className="flex items-center gap-2 mb-2 text-emerald-700">
-                              <Leaf className="size-4" />
-                              <span className="text-xs font-black uppercase tracking-tighter">Care Tip</span>
+                          /* 2. 그 외 카드: Care Tip 가이드 표시 */
+                          <div className="bg-white/50 p-3.5 rounded-xl border border-white/40 shadow-inner">
+                            <div className="flex items-center gap-2 mb-2 text-emerald-800/70">
+                              <Leaf className="size-3.5" />
+                              <span className="text-[10px] font-black uppercase tracking-wider">Management Guide</span>
                             </div>
-                            <p className="text-sm text-gray-700 leading-relaxed">
+                            <p className="text-xs text-gray-700 leading-relaxed font-medium">
                               {getCareTip(status.label, status.value)}
                             </p>
                           </div>
@@ -1268,7 +758,7 @@ export function StatusView({ setError }: StatusViewProps) {
         </div>
       </div>
 
-      {/* ✅ 이 주석 아래의 <Dialog> 전체를 아래 내용으로 덮어쓰세요! */}
+
       {/* 실시간 카메라 모달 */}
       <Dialog open={showCamera} onOpenChange={setShowCamera}>
         <DialogContent className="max-w-3xl bg-white/95 backdrop-blur-md border-2 border-emerald-100 rounded-3xl">
