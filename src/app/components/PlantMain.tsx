@@ -42,7 +42,7 @@ export function PlantMain() {
 
             <Sidebar isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} setActiveTab={setActiveTab} activeTab={activeTab} />
 
-            <button onClick={() => setIsMenuOpen(true)} className="fixed top-6 left-6 z-50 p-3 bg-white/60 backdrop-blur-md rounded-2xl shadow-lg border border-white/20">
+            <button onClick={() => setIsMenuOpen(true)} className="fixed top-[calc(env(safe-area-inset-top)+1.5rem)] left-6 z-50 p-3 bg-white/60 backdrop-blur-md rounded-2xl shadow-lg border border-white/20">
                 <Menu className="size-6 text-emerald-800" />
             </button>
 
