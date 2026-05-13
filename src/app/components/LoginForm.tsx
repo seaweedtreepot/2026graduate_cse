@@ -59,7 +59,7 @@ export function LoginForm() {
             Green Mate <span className="text-emerald-500 font-light">AI</span>
           </CardTitle>
           <CardDescription className="text-emerald-700/80 font-medium">
-            반려식물의 성장을 돕는 스마트 정원에 오신 걸 환영해요!
+            반려식물의 정원에 오신 걸 환영해요!
           </CardDescription>
         </CardHeader>
 

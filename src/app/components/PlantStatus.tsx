@@ -508,7 +508,7 @@ export function StatusView({ setError }: StatusViewProps) {
       {/*캐릭터*/}
       <div className="relative z-10 w-full max-w-4xl mx-auto p-6 space-y-6">
         <motion.div
-          className="h-[45vh] flex flex-col items-center justify-start pt-10 relative" // justify-center 대신 justify-start + pt-10 사용
+          className="flex flex-col items-center justify-start pt-10 pb-4 relative" // justify-center 대신 justify-start + pt-10 사용
           animate={{
             scale: characterMood.scale,
             rotate: characterMood.rotation,
