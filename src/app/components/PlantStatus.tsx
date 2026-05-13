@@ -363,7 +363,7 @@ export function StatusView({ setError }: StatusViewProps) {
     // 예: /assets/character/lv1_happy.png
     //테스트를 위해 1레벨로만 설정
     //const imageSrc = `/src/public/assets/character/lv${currentLevel}_${mood}.png`;
-    const imageSrc = `/src/public/assets/character/lv1_${mood}.png`;
+    const imageSrc = `/assets/character/lv1_${mood}.png`;
 
     return { imageSrc, mood, scale, rotation, color };
   };

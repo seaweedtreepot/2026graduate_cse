@@ -43,7 +43,7 @@ export function GuideView() {
                     className="relative h-80 rounded-[2.5rem] overflow-hidden shadow-2xl"
                 >
                     <img
-                        src="/src/public/assets/dashboard/dashBoard.png"
+                        src="/assets/dashboard/dashBoard.png"
                         className="absolute inset-0 w-full h-full object-cover"
                         alt="Basil"
                     />
