@@ -39,126 +39,121 @@ export function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-green-50 via-emerald-50 to-teal-100 p-4">
-      {/* 배경에 떠다니는 듯한 느낌의 블러 효과 원형 (AI/디지털 느낌 강조) */}
-      <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-green-200/40 rounded-full blur-3xl animate-pulse" />
-      <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-emerald-200/40 rounded-full blur-3xl animate-pulse delay-700" />
+    // ✅ p-4를 sm:p-4로 변경하여 모바일에서는 여백 제거
+    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-green-50 via-emerald-50 to-teal-100 sm:p-4 transition-all">
 
-      <Card className="w-full max-w-md border-none shadow-2xl bg-white/80 backdrop-blur-md z-10">
-        <CardHeader className="space-y-2 text-center">
-          <div className="flex justify-center mb-2">
-            <div className="p-3 bg-emerald-100 rounded-2xl text-emerald-600 shadow-inner">
-              <Sprout size={36} className="animate-bounce-slow" />
+      {/* 배경 장식 (모바일에서는 조금 더 흐릿하게 처리하여 콘텐츠 집중도 향상) */}
+      <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-green-200/30 rounded-full blur-3xl animate-pulse sm:opacity-100 opacity-50" />
+      <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-emerald-200/30 rounded-full blur-3xl animate-pulse delay-700 sm:opacity-100 opacity-50" />
+
+      {/* 
+         ✅ 카드 스타일 수정:
+         - 모바일: w-full, h-full(또는 min-h-screen), rounded-none, shadow-none
+         - 데스크탑(sm 이상): max-w-md, h-auto, rounded-3xl, shadow-2xl
+      */}
+      <Card className="w-full sm:max-w-md min-h-screen sm:min-h-0 border-none sm:border-solid shadow-none sm:shadow-2xl bg-white/90 sm:bg-white/80 backdrop-blur-xl z-10 sm:rounded-[2.5rem] rounded-none flex flex-col justify-center">
+
+        {/* 내부 패딩을 px-8로 늘려 콘텐츠를 더 큼직하게 배치 */}
+        <CardHeader className="space-y-4 text-center pt-12 sm:pt-6 px-8">
+          <div className="flex justify-center">
+            <div className="p-4 bg-emerald-100 rounded-[2rem] text-emerald-600 shadow-inner group transition-transform hover:scale-110">
+              <Sprout size={40} className="animate-bounce-slow" />
             </div>
           </div>
-          <CardTitle className="text-3xl font-extrabold tracking-tight text-emerald-900">
-            Green Mate <span className="text-emerald-500 font-light">AI</span>
-          </CardTitle>
-          <CardDescription className="text-emerald-700/80 font-medium">
-            반려식물의 성장을 돕는 스마트 정원에 오신 걸 환영해요!
-          </CardDescription>
+          <div className="space-y-1">
+            <CardTitle className="text-4xl font-black tracking-tighter text-emerald-900">
+              Green Mate <span className="text-emerald-500">AI</span>
+            </CardTitle>
+            <CardDescription className="text-emerald-700/60 font-bold text-base">
+              반려식물을 위한 스마트 정원
+            </CardDescription>
+          </div>
         </CardHeader>
 
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-4">
-              {/* 이메일 입력 섹션 */}
+        <CardContent className="px-8 pb-8">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-5">
+              {/* 이메일 섹션 */}
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-emerald-800 ml-1">이메일 계정</Label>
+                <Label htmlFor="email" className="text-[11px] font-black text-emerald-800 uppercase tracking-wider ml-1">이메일 계정</Label>
                 <div className="relative group">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-emerald-400 group-focus-within:text-emerald-600 transition-colors" />
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-emerald-400 group-focus-within:text-emerald-600 transition-colors" />
                   <Input
                     id="email"
                     type="email"
                     placeholder="example@green.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10 border-emerald-100 focus:border-emerald-400 focus:ring-emerald-400 bg-white/50"
+                    // ✅ 높이를 h-14로 늘려 모바일 터치감과 가독성 향상
+                    className="h-14 pl-12 rounded-2xl border-emerald-100 bg-white/50 focus:ring-2 focus:ring-emerald-500/20 transition-all text-base"
                     required
                   />
                 </div>
               </div>
 
-              {/* 비밀번호 입력 섹션 */}
+              {/* 비밀번호 섹션 */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between ml-1">
-                  <Label htmlFor="password" className="text-emerald-800">비밀번호</Label>
-                  <button
-                    type="button"
-                    className="text-xs text-emerald-600 hover:text-emerald-500 hover:underline transition-all"
-                    onClick={() => navigate('/forgot-password')}
-                  >
-                    분실하셨나요?
-                  </button>
+                  <Label htmlFor="password" className="text-[11px] font-black text-emerald-800 uppercase tracking-wider">비밀번호</Label>
                 </div>
                 <div className="relative group">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-emerald-400 group-focus-within:text-emerald-600 transition-colors" />
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-emerald-400 group-focus-within:text-emerald-600 transition-colors" />
                   <Input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 pr-10 border-emerald-100 focus:border-emerald-400 focus:ring-emerald-400 bg-white/50"
+                    className="h-14 pl-12 pr-12 rounded-2xl border-emerald-100 bg-white/50 text-base"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-300 hover:text-emerald-600 transition-colors"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-300 hover:text-emerald-600"
                   >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
                 </div>
+                <button
+                  type="button"
+                  className="text-xs font-bold text-emerald-600/60 hover:text-emerald-500 mt-2 ml-1"
+                  onClick={() => navigate('/forgot-password')}
+                >
+                  비밀번호를 잊으셨나요?
+                </button>
               </div>
             </div>
 
-            {/* 게이미피케이션 요소가 가미된 로그인 버튼 */}
             <Button
               type="submit"
-              className="w-full mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-6 rounded-xl shadow-lg shadow-emerald-200 transition-all active:scale-[0.98]"
+              className="w-full h-16 mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-lg rounded-2xl shadow-xl shadow-emerald-200 transition-all active:scale-[0.97]"
               disabled={isLoading}
             >
-              {isLoading ? (
-                <span className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  정원 데이터 불러오는 중...
-                </span>
-              ) : (
-                <span className="flex items-center gap-2 text-lg">
-                  <Sparkles size={20} /> 정원 입장하기
-                </span>
-              )}
+              {isLoading ? "데이터 로드 중..." : "정원 입장하기"}
             </Button>
           </form>
         </CardContent>
 
-        <CardFooter className="flex flex-col space-y-6 pt-2">
-          {/* 가입 유도 섹션 */}
-          <div className="text-sm text-center text-emerald-800">
+        <CardFooter className="flex flex-col space-y-8 px-8 pb-12 sm:pb-8">
+          <div className="text-sm text-center font-medium text-emerald-800/70">
             아직 정원사가 아니신가요?{' '}
             <button
               type="button"
-              className="font-bold text-emerald-600 hover:text-emerald-500 hover:underline underline-offset-4"
+              className="font-black text-emerald-600 underline underline-offset-4"
               onClick={() => navigate('/register')}
             >
-              지금 씨앗 심기 (회원가입)
+              회원가입 하기
             </button>
           </div>
 
-          {/* 개발자용 빠른 메뉴 (디자인 개선) */}
-          <div className="w-full flex items-center gap-2">
-            <div className="h-[1px] flex-1 bg-emerald-100" />
-            <span className="text-[10px] uppercase tracking-widest text-emerald-300 font-semibold">Dev Mode</span>
-            <div className="h-[1px] flex-1 bg-emerald-100" />
-          </div>
-
+          {/* 데브 모드 디자인 간소화 (모바일에서 공간 확보) */}
           <button
             type="button"
-            className="flex items-center gap-2 text-xs text-emerald-400 hover:text-emerald-600 mx-auto transition-colors"
+            className="flex items-center gap-2 text-[10px] font-black tracking-[0.2em] text-emerald-300 hover:text-emerald-500 mx-auto transition-colors uppercase"
             onClick={() => navigate('/plant-list')}
           >
-            <Leaf size={12} /> 기기 등록 프리뷰
+            <Leaf size={12} /> Device Preview
           </button>
         </CardFooter>
       </Card>
