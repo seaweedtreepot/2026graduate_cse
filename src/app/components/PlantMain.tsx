@@ -23,7 +23,7 @@ export function PlantMain() {
                 <motion.div
                     initial={{ y: -50 }}
                     animate={{ y: 0 }}
-                    className="fixed top-0 left-0 right-0 z-[100] bg-rose-500 text-white py-2 px-4 flex items-center justify-center gap-4 shadow-lg"
+                    className="fixed top-0 left-0 right-0 z-[100] bg-rose-500 pt-[env(safe-area-inset-top)] text-white py-2 px-4 flex items-center justify-center gap-4 shadow-lg"
                 >
                     <div className="flex items-center gap-2">
                         <AlertCircle className="size-4 animate-pulse" />
