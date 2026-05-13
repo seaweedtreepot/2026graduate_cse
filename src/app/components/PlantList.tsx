@@ -101,6 +101,20 @@ export function PlantList() {
                     >
                         <Plus className="size-5" /> 새 식물 등록
                     </Button>
+                    {isError && (
+                        <Button
+                            onClick={() => {
+                                // 테스트를 위해 에러를 끄고 더미 데이터를 넣어주는 로직을 연결하면 좋습니다.
+                                setIsError(false);
+                                setPlants([
+                                    { id: 999, name: "테스트 바질", species: "BASIL", status: "good", level: 3 }
+                                ]);
+                            }}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl gap-2 shadow-lg py-6 px-6"
+                        >
+                            <Plus className="size-5" /> 테스트용 식물 버튼
+                        </Button>
+                    )}
                 </header>
 
                 {isLoading ? (

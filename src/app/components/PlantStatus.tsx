@@ -361,7 +361,9 @@ export function StatusView({ setError }: StatusViewProps) {
 
     // [수정 포인트] 이미지 경로 생성
     // 예: /assets/character/lv1_happy.png
-    const imageSrc = `/src/public/assets/character/lv${currentLevel}_${mood}.png`;
+    //테스트를 위해 1레벨로만 설정
+    //const imageSrc = `/src/public/assets/character/lv${currentLevel}_${mood}.png`;
+    const imageSrc = `/src/public/assets/character/lv1_${mood}.png`;
 
     return { imageSrc, mood, scale, rotation, color };
   };
