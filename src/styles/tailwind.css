@@ -1,4 +1,11 @@
 /* src/styles/tailwind.css */
+html,
+body,
+#root {
+    height: 100%;
+    overflow: hidden;
+}
+
 @import "tailwindcss";
 
 @source "../../src/**/*.{js,ts,jsx,tsx}";
