@@ -19,27 +19,20 @@ interface StatusIndicator {
 }
 
 
-const LEVEL_NAMES: Record<number, string> = {
-  1: '씨앗',
-  2: '새싹',
-  3: '성장',
-  4: '개화',
-  5: '결실',
-};
+const LEVEL_NAMES: Record<number, string> = { 1: '씨앗', 2: '새싹', 3: '성장', 4: '개화', 5: '결실' };
 
 const LEVEL_TO_PROGRESS: Record<number, number> = {
   1: 5, 2: 25, 3: 55, 4: 85, 5: 100,
 };
 
-interface StatusViewProps {
-  setError: (val: boolean) => void;
-}
+interface StatusViewProps { setError: (val: boolean) => void; }
 
 export function StatusView({ setError }: StatusViewProps) {
   const [searchParams] = useSearchParams();
 
   const plantId = searchParams.get('id');
   const plantName = searchParams.get('plant') || '바질';
+
   const [showCamera, setShowCamera] = useState(false);
   const [selectedAction, setSelectedAction] = useState<string | null>(null);
   const [streamUrl, setStreamUrl] = useState<string>(''); // 스트리밍 주소 저장

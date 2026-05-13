@@ -12,7 +12,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ isOpen, onClose, setActiveTab, activeTab }: SidebarProps) {
-    const navigate = useNavigate(); // 페이지 이동을 위한 함수
+    const navigate = useNavigate();
 
     const menuItems = [
         { id: 'status' as const, label: '현재 상태', icon: Sprout },
@@ -24,6 +24,7 @@ export function Sidebar({ isOpen, onClose, setActiveTab, activeTab }: SidebarPro
         <AnimatePresence>
             {isOpen && (
                 <>
+                    {/* 뒷배경 어둡게 처리 (Overlay) */}
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -32,11 +33,15 @@ export function Sidebar({ isOpen, onClose, setActiveTab, activeTab }: SidebarPro
                         className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60]"
                     />
 
+                    {/* 사이드바 본체 */}
                     <motion.div
-                        initial={{ x: '-100%' }}
+                        // 핵심 수정: x 좌표를 -105%로 설정하여 여유 공간 확보
+                        initial={{ x: '-105%' }}
                         animate={{ x: 0 }}
-                        exit={{ x: '-100%' }}
-                        className="fixed top-0 left-0 bottom-0 w-64 bg-white/90 backdrop-blur-xl z-[70] p-6 shadow-2xl flex flex-col"
+                        exit={{ x: '-105%' }}
+                        transition={{ type: 'spring', damping: 28, stiffness: 250 }}
+                        // 핵심 수정: shadow-[-20px...]를 추가하여 왼쪽 틈새 메움
+                        className="fixed top-0 left-0 bottom-0 w-64 bg-white/95 backdrop-blur-xl z-[70] p-6 shadow-2xl shadow-[-20px_0_0_0_#ffffff] flex flex-col"
                     >
                         <div className="flex justify-between items-center mb-10 text-emerald-900">
                             <h2 className="text-xl font-bold">메뉴</h2>
@@ -45,7 +50,7 @@ export function Sidebar({ isOpen, onClose, setActiveTab, activeTab }: SidebarPro
                             </button>
                         </div>
 
-                        {/* 1. 기본 탭 메뉴 (내부 화면 전환) */}
+                        {/* 메뉴 아이템 */}
                         <nav className="space-y-2 flex-1">
                             {menuItems.map((item) => {
                                 const Icon = item.icon;
@@ -68,12 +73,12 @@ export function Sidebar({ isOpen, onClose, setActiveTab, activeTab }: SidebarPro
                             })}
                         </nav>
 
-                        {/* 2. 하단 내 식물 목록 / 추가 버튼 (페이지 이동) */}
+                        {/* 하단 버튼 */}
                         <div className="pt-6 border-t border-emerald-100 space-y-2">
                             <button
                                 onClick={() => {
-                                    onClose(); // 사이드바 닫기
-                                    navigate('/plant-list'); // 식물 목록으로 이동
+                                    onClose();
+                                    navigate('/plant-list');
                                 }}
                                 className="w-full flex items-center gap-4 p-4 rounded-xl text-slate-600 hover:bg-slate-100 transition-all"
                             >
@@ -83,8 +88,8 @@ export function Sidebar({ isOpen, onClose, setActiveTab, activeTab }: SidebarPro
 
                             <button
                                 onClick={() => {
-                                    onClose(); // 사이드바 닫기
-                                    navigate('/plant-selection'); // 식물 선택/등록 페이지로 이동
+                                    onClose();
+                                    navigate('/plant-selection');
                                 }}
                                 className="w-full flex items-center gap-4 p-4 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-all border border-emerald-200"
                             >
