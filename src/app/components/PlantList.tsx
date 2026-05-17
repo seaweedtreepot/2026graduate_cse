@@ -3,7 +3,7 @@ import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
-import { Sprout, Plus, ChevronRight, Activity, Leaf, Sparkles, AlertCircle, WifiOff, RefreshCw, Skull, Archive, X, Info } from 'lucide-react';
+import { Sprout, Plus, ChevronRight, Activity, Leaf, Sparkles, AlertCircle, WifiOff, RefreshCw, Skull, Archive, X, Info, Bell, BellOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../api/axios';
 import { UserContext } from '../context/UserContext';
@@ -47,21 +47,30 @@ export function PlantList() {
     const [selectedReport, setSelectedReport] = useState<DeathReport | null>(null);
     const [isReportLoading, setIsReportLoading] = useState(false);
 
-    // 🔔 [안전장치] 이 상태 변수들은 하단 에러 방지를 위해 그대로 유지합니다!
-    const [fcmToken, setFcmToken] = useState<string>('');
+    // 🔔 알림 권한 상태
+    const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unknown'>('unknown');
 
-    // 아이폰 사파리 전용 수동 알림 권한 요청 함수
-    const handleWebPushRequest = async () => {
+    // 컴포넌트 마운트 시 현재 권한 상태 확인
+    useEffect(() => {
+        if (typeof Notification !== 'undefined') {
+            setNotifPermission(Notification.permission);
+        }
+    }, []);
+
+    // 아이폰 Safari PWA 전용 — 사용자 제스처로만 호출해야 작동함
+    const handleRequestNotificationPermission = async () => {
         try {
             if (!messaging) return;
+
             const permission = await Notification.requestPermission();
+            setNotifPermission(permission); // 결과 즉시 반영해서 배너 숨기기
+
             if (permission === 'granted') {
                 const token = await getToken(messaging, {
                     vapidKey: 'BN-4-rDMQp_55ccwsKQNpzRLk-WD5H5zlQLTE6CHVbhuZdAkmCMtLF2p6SdIxJJOW0f4wUWHFxPII0vHmVHJ0DU'
                 });
                 if (token) {
                     console.log("🟢 아이폰 웹 FCM 토큰 발급 성공:", token);
-                    setFcmToken(token);
                     try { await api.post('/users/me/fcm-token', { fcmToken: token }); } catch (e) { }
                 }
             }
@@ -108,7 +117,7 @@ export function PlantList() {
         fetchPlants();
     }, []);
 
-    // 자동 등록 useEffect 블록
+    // 자동 등록 useEffect — 이미 granted인 경우에만 토큰 재발급
     useEffect(() => {
         const initPushNotification = async () => {
             try {
@@ -122,22 +131,18 @@ export function PlantList() {
                     await PushNotifications.register();
                     await PushNotifications.addListener('registration', async (token) => {
                         console.log('🟢 앱 FCM 토큰 발급 성공:', token.value);
-                        setFcmToken(token.value);
                         try {
                             await api.post('/users/me/fcm-token', { fcmToken: token.value });
                         } catch (e) { }
                     });
                 } else {
                     if (!messaging) return;
-                    if (typeof Notification !== 'undefined') {
-                        if (Notification.permission === 'granted') {
-                            const token = await getToken(messaging, {
-                                vapidKey: 'BN-4-rDMQp_55ccwsKQNpzRLk-WD5H5zlQLTE6CHVbhuZdAkmCMtLF2p6SdIxJJOW0f4wUWHFxPII0vHmVHJ0DU'
-                            });
-                            if (token) {
-                                setFcmToken(token);
-                                try { await api.post('/users/me/fcm-token', { fcmToken: token }); } catch (e) { }
-                            }
+                    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+                        const token = await getToken(messaging, {
+                            vapidKey: 'BN-4-rDMQp_55ccwsKQNpzRLk-WD5H5zlQLTE6CHVbhuZdAkmCMtLF2p6SdIxJJOW0f4wUWHFxPII0vHmVHJ0DU'
+                        });
+                        if (token) {
+                            try { await api.post('/users/me/fcm-token', { fcmToken: token }); } catch (e) { }
                         }
                     }
                 }
@@ -164,17 +169,25 @@ export function PlantList() {
     const healthyPlantsCount = plants.filter(p => p.status === 'good').length;
     const displayPlants = viewMode === 'live' ? livePlants : deadPlants;
 
+    // 배너 표시 조건:
+    // - 웹(Safari PWA)이고
+    // - Notification API가 존재하고
+    // - 아직 결정 안 한 상태(default)일 때만
+    const showNotifBanner =
+        !Capacitor.isNativePlatform() &&
+        typeof Notification !== 'undefined' &&
+        notifPermission === 'default';
+
     return (
         <div className="h-[100dvh] w-full overflow-y-auto overflow-x-hidden bg-gradient-to-br from-green-50 via-emerald-50 to-teal-100 p-6 pb-32 relative">
-
-            {/* 🎯 주황색 버튼과 노란색 뷰어 UI 박스만 깔끔하게 싹 지웠습니다! 컴파일 에러 요소 제로! */}
 
             {/* 배경 장식 */}
             <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-green-200/20 rounded-full blur-3xl -z-10" />
             <div className="absolute bottom-[-10%] left-[-10%] w-96 h-96 bg-emerald-200/20 rounded-full blur-3xl -z-10" />
 
             <div className="max-w-5xl mx-auto space-y-8 relative z-10">
-                {/* 상단 알림 바 */}
+
+                {/* 상단 알림 바 — 서버 에러 */}
                 <AnimatePresence>
                     {isError && (
                         <motion.div
@@ -193,6 +206,41 @@ export function PlantList() {
                             >
                                 <RefreshCw className="size-3" /> 다시 시도
                             </button>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* 🔔 알림 권한 요청 배너 — default 상태일 때만 노출 */}
+                <AnimatePresence>
+                    {showNotifBanner && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -16 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -16 }}
+                            className="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl flex items-center justify-between shadow-sm"
+                        >
+                            <div className="flex items-center gap-3 text-emerald-700">
+                                <Bell className="size-5 shrink-0" />
+                                <span className="text-sm font-bold leading-snug">
+                                    식물 알림을 받으려면<br className="sm:hidden" /> 허용해 주세요
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {/* 거절 — 배너만 닫음 (permission은 건드리지 않음) */}
+                                <button
+                                    onClick={() => setNotifPermission('denied')}
+                                    className="text-xs font-bold text-emerald-400 px-3 py-1.5 rounded-xl hover:bg-emerald-100 transition-colors"
+                                >
+                                    나중에
+                                </button>
+                                {/* 허용 — 사용자 제스처로 requestPermission 호출 */}
+                                <button
+                                    onClick={handleRequestNotificationPermission}
+                                    className="flex items-center gap-1 text-xs font-black bg-emerald-500 text-white px-4 py-1.5 rounded-xl hover:bg-emerald-600 active:scale-95 transition-all shadow-md shadow-emerald-200"
+                                >
+                                    <Bell className="size-3" /> 허용
+                                </button>
+                            </div>
                         </motion.div>
                     )}
                 </AnimatePresence>
@@ -290,7 +338,14 @@ export function PlantList() {
                                                     src={isDead ? `/assets/character/lv${plant.level}_sad.png` : `/assets/character/lv${plant.level}_happy.png`}
                                                     className="w-full h-full object-contain relative z-10 transition-transform duration-500 group-hover:scale-110"
                                                     alt={plant.name}
-                                                    onError={(e) => (e.currentTarget.src = '🌱')}
+                                                    onError={(e) => {
+                                                        const target = e.currentTarget;
+                                                        // 무한 루프 방지: fallback으로 이미 바꿨으면 재시도 안 함
+                                                        if (!target.dataset.fallback) {
+                                                            target.dataset.fallback = 'true';
+                                                            target.src = '/assets/character/default.png';
+                                                        }
+                                                    }}
                                                 />
                                             </div>
                                             <div className="text-center space-y-3">
