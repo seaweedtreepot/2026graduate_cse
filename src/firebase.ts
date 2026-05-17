@@ -2,7 +2,6 @@ import { initializeApp } from "firebase/app";
 import { getMessaging, getToken, onMessage, isSupported } from "firebase/messaging";
 import { getAnalytics } from "firebase/analytics";
 
-// Your web app's Firebase configuration
 const firebaseConfig = {
     apiKey: "AIzaSyDtFTrz5EKv9qsd6b_jyUY2sfGypfVzy1Q",
     authDomain: "greenmate-7b029.firebaseapp.com",
@@ -13,19 +12,22 @@ const firebaseConfig = {
     measurementId: "G-SM9XSE56LY"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Analytics 안전장치 (웹 환경에서만 작동하도록 보장)
 const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 
-// 🚨 [핵심 수정 구역] iOS 앱 크래시 방지용 변수 선언
-let messaging: any = null;
+// messaging을 직접 export하는 대신, 필요할 때 호출하는 함수로 변경
+// isSupported()가 비동기라 타이밍 문제 없이 안전하게 인스턴스를 반환합니다
+export const getMessagingInstance = async () => {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return null;
 
-// 브라우저 환경이면서 'Service Worker'를 지원하는 환경(즉, 일반 웹)에서만 실행합니다.
-// 아이폰 앱(Capacitor) 환경에서는 serviceWorker가 없으므로 이 if문을 건너뛰어 안전합니다!
-if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-    messaging = getMessaging(app);
-}
+    const supported = await isSupported();
+    if (!supported) {
+        console.warn("🔕 FCM 미지원 환경 (iOS 16.3 이하 또는 PWA 아님)");
+        return null;
+    }
 
-export { messaging, getToken, onMessage, isSupported };
+    return getMessaging(app);
+};
+
+export { getToken, onMessage, isSupported };
