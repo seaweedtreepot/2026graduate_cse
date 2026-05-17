@@ -6,10 +6,13 @@ import { Sprout, Plus, ChevronRight, Activity, Leaf, Sparkles, AlertCircle, Wifi
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../api/axios';
 import { UserContext } from '../context/UserContext';
+import { messaging, getToken } from '../../firebase';
+import { Capacitor } from '@capacitor/core';
+import { PushNotifications } from '@capacitor/push-notifications';
 
 // [수정] Plant 인터페이스에 'dead' 상태 가능성 고려
 interface Plant {
-    id: number;
+    plantId: number;
     name: string;
     species: string;
     status: 'good' | 'warning' | 'critical' | 'dead' | string;
@@ -17,10 +20,10 @@ interface Plant {
 }
 // [수정] 테스트 데이터에 죽은 식물 추가
 const DUMMY_PLANTS: Plant[] = [
-    { id: 101, name: "실험체 바질1", species: "BASIL", status: "good", level: 1 },
-    { id: 102, name: "실험체 바질2", species: "BASIL", status: "warning", level: 2 },
-    { id: 103, name: "실험체 바질 3", species: "BASIL", status: "dead", level: 1 }, // 죽은 식물 예시
-    { id: 104, name: "실험체 바질4", species: "BASIL", status: "good", level: 1 },
+    { plantId: 101, name: "실험체 바질1", species: "BASIL", status: "good", level: 1 },
+    { plantId: 102, name: "실험체 바질2", species: "BASIL", status: "warning", level: 2 },
+    { plantId: 103, name: "실험체 바질 3", species: "BASIL", status: "dead", level: 1 }, // 죽은 식물 예시
+    { plantId: 104, name: "실험체 바질4", species: "BASIL", status: "good", level: 1 },
 ];
 // [추가] 리포트 데이터 인터페이스
 interface DeathReport {
@@ -40,6 +43,7 @@ export function PlantList() {
     const [viewMode, setViewMode] = useState<'live' | 'dead'>('live');
     const [selectedReport, setSelectedReport] = useState<DeathReport | null>(null);
     const [isReportLoading, setIsReportLoading] = useState(false);
+    const [fcmToken, setFcmToken] = useState<string>('');
 
     const fetchPlants = async () => {
         setIsLoading(true);
@@ -60,7 +64,7 @@ export function PlantList() {
     const fetchDeathReport = async (plantId: number) => {
         setIsReportLoading(true);
         try {
-            // 실제 API: const res = await api.get(`/plants/${plantId}/death-report`);
+            const res = await api.get(`/plants/${plantId}/reports/death`);
             // setSelectedReport(res.data);
 
             // 테스트용 가상 데이터
@@ -83,6 +87,68 @@ export function PlantList() {
     useEffect(() => {
         fetchPlants();
     }, []);
+    // 🎯 [여기부터 추가] 진짜 앱처럼 최초 진입 시 푸시 알림 권한을 획득하고 토큰을 저장하는 일등 공신 코드입니다!
+    useEffect(() => {
+        const initPushNotification = async () => {
+            try {
+                // 📱 케이스 1: 스마트폰 앱(안드로이드/iOS) 환경일 때
+                if (Capacitor.isNativePlatform()) {
+                    console.log("📱 모바일 앱 환경 푸시 알림 세팅 기동");
+
+                    let permStatus = await PushNotifications.checkPermissions();
+                    if (permStatus.receive === 'prompt') {
+                        permStatus = await PushNotifications.requestPermissions();
+                    }
+                    if (permStatus.receive !== 'granted') return;
+
+                    await PushNotifications.register();
+                    await PushNotifications.addListener('registration', async (token) => {
+                        console.log('🟢 앱 FCM 토큰 발급 성공:', token.value);
+                        setFcmToken(token.value);
+
+                        // 백엔드로 앱 토큰 전송 (서버 타임아웃 예외처리 포함)
+                        try {
+                            await api.post('/users/me/fcm-token', { fcmToken: token.value });
+                        } catch (e) {
+                            console.error("백엔드 토큰 저장 실패(앱):", e);
+                        }
+                    });
+                }
+
+                // 🌐 케이스 2: 일반 PC/모바일 웹 브라우저 환경일 때
+                else {
+                    console.log("🌐 웹 브라우저 환경 푸시 알림 세팅 기동");
+
+                    if (Notification.permission === 'granted') {
+                        const token = await getToken(messaging, {
+                            vapidKey: 'BN-4-rDMQp_55ccwsKQNpzRLk-WD5H5zlQLTE6CHVbhuZdAkmCMtLF2p6SdIxJJOW0f4wUWHFxPII0vHmVHJ0DU'
+                        });
+                        if (token) {
+                            console.log("🔄 [FCM] 기존 허용 기기 - 토큰 동기화 완료", token);
+                            setFcmToken(token);
+                            try { await api.post('/users/me/fcm-token', { fcmToken: token }); } catch (e) { }
+                        }
+                    } else if (Notification.permission === 'default') {
+                        const permission = await Notification.requestPermission();
+                        if (permission === 'granted') {
+                            const token = await getToken(messaging, {
+                                vapidKey: 'BN-4-rDMQp_55ccwsKQNpzRLk-WD5H5zlQLTE6CHVbhuZdAkmCMtLF2p6SdIxJJOW0f4wUWHFxPII0vHmVHJ0DU'
+                            });
+                            if (token) {
+                                console.log("🟢 [FCM] 신규 유저 - 토큰 최초 등록 성공!", token);
+                                setFcmToken(token);
+                                try { await api.post('/users/me/fcm-token', { fcmToken: token }); } catch (e) { }
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error("❌ FCM 통합 등록 중 오류 발생:", error);
+            }
+        };
+
+        initPushNotification();
+    }, []);
 
     const getStatusConfig = (status: string) => {
         switch (status) {
@@ -104,6 +170,19 @@ export function PlantList() {
 
     return (
         <div className="h-[100dvh] w-full overflow-y-auto overflow-x-hidden bg-gradient-to-br from-green-50 via-emerald-50 to-teal-100 p-6 pb-32 relative">
+            {/* ⬇️ 여기에 이 코드를 쏙 집어넣어 줍니다! */}
+            {fcmToken && (
+                <div className="fixed top-0 left-0 w-full bg-yellow-100 p-4 z-[9999] border-b-2 border-yellow-400 pointer-events-auto">
+                    <p className="text-xs font-black text-yellow-800 mb-1">⚠️ [FCM 토큰 복사용 뷰어]</p>
+                    <textarea
+                        readOnly
+                        value={fcmToken}
+                        onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+                        className="w-full h-12 text-[10px] p-1 border rounded bg-white font-mono text-slate-700"
+                    />
+                    <p className="text-[9px] text-gray-500 mt-1">터치하면 전체 선택됩니다. 복사해서 PC 카톡으로 전송하세요!</p>
+                </div>
+            )}
 
             {/* [기존 유지] 배경 장식 */}
             <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-green-200/20 rounded-full blur-3xl -z-10" />
@@ -217,17 +296,17 @@ export function PlantList() {
 
                             return (
                                 <motion.div
-                                    key={plant.id}
+                                    key={plant.plantId}
                                     initial={{ opacity: 0, y: 20 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: index * 0.1 }}
                                     onClick={() => {
                                         if (isDead) {
                                             // 1. 죽은 식물이면 사망 리포트 함수 호출
-                                            fetchDeathReport(plant.id);
+                                            fetchDeathReport(plant.plantId);
                                         } else {
                                             // 2. 살아있는 식물이면 기존처럼 상세 페이지로 이동
-                                            navigate(`/plant-status?id=${plant.id}&plant=${plant.name}&level=${plant.level}`);
+                                            navigate(`/plant-status?plantId=${plant.plantId}&plant=${plant.name}&level=${plant.level}`);
                                         }
                                     }}
                                     // 죽은 카드도 클릭은 되어야 하므로 cursor-pointer를 조건부로 관리

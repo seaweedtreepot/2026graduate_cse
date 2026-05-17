@@ -21,7 +21,7 @@ export function ForgotPassword() {
 
         try {
             // 서버의 비밀번호 재설정 이메일 발송 엔드포인트 (예: /auth/forgot-password)
-            await api.post('/auth/forgot-password', { email });
+            await api.post('/auth/password-reset', { email });
             setIsSubmitted(true);
         } catch (err: any) {
             console.error('비밀번호 찾기 에러:', err);

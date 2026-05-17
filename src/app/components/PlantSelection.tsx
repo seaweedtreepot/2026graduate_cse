@@ -30,18 +30,24 @@ export function PlantSelection() {
   const handleFinalConfirm = async () => {
     setIsLoading(true);
     try {
-      // 바질 정보 고정 사용
       const plantInfo = plants[0];
-      const response = await api.post('/users/me/plants', {
-        species: plantInfo.name,
-        name: nickname,
-        plantedAt: plantedDate,
-        level: 1
+
+      // 💡 백엔드 명세서 요구사항 { name, species, age, level }에 정확히 맞춤
+      const response = await api.post('/plants', {
+        name: nickname,          // 유저가 입력한 식물 닉네임 (예: "바질이")
+        species: plantInfo.name, // 식물 종류 ("Basil")
+        age: 0,                  // 명세서에서 숫자를 요구하므로, 새로 심은 당일 기준 0(또는 1) 전송
+        level: 1                 // 초기 생장 레벨 1 고정
       });
-      const newPlantId = response.data.id || response.data.plantId;
+
+      // 백엔드 응답 포맷인 { plantId: 1, status: "success" }에 맞게 파싱
+      const newPlantId = response.data.plantId;
+
+      // 상태 관리 화면으로 이동 (기존 쿼리스트링 유지)
       navigate(`/plant-status?id=${newPlantId}&plant=${nickname}&plantedAt=${plantedDate}&level=1`);
     } catch (err) {
-      alert("식물 등록에 실패했습니다. (서버 연결 확인 필요)");
+      console.error("식물 등록 에러 상세:", err);
+      alert("식물 등록에 실패했습니다. (서버 엔드포인트 및 데이터 형식 확인 필요)");
     } finally {
       setIsLoading(false);
     }

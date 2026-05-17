@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router'; // 프로젝트 환경에 따라 'react-router' 또는 'react-router-dom'
-import api from '../api/axios';
+import { publicApi } from '../api/axios';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -15,6 +15,7 @@ export function Register() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [nickname, setNickname] = useState('');
 
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -33,10 +34,11 @@ export function Register() {
         }
 
         try {
-            await api.post('/auth/register', {
-                name,
+            await publicApi.post('/auth/register', {
                 email,
                 password,
+                name,
+                nickname
             });
 
             alert('정원사 등록이 완료되었습니다! 첫 씨앗을 심으러 가볼까요?');
@@ -74,7 +76,7 @@ export function Register() {
                     <form onSubmit={handleSubmit} className="space-y-4">
                         {/* 이름 입력 */}
                         <div className="space-y-2">
-                            <Label htmlFor="name" className="text-emerald-800 ml-1">이름 (닉네임)</Label>
+                            <Label htmlFor="name" className="text-emerald-800 ml-1">이름</Label>
                             <div className="relative group">
                                 <User className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-emerald-400 group-focus-within:text-emerald-600 transition-colors" />
                                 <Input
@@ -82,6 +84,21 @@ export function Register() {
                                     placeholder="멋진 정원사 이름"
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
+                                    className="pl-10 border-emerald-100 focus:border-emerald-400 focus:ring-emerald-400 bg-white/50"
+                                    required
+                                />
+                            </div>
+                        </div>
+                        {/* 💡 새로 추가된 닉네임 입력창 */}
+                        <div className="space-y-2">
+                            <Label htmlFor="nickname" className="text-emerald-800 ml-1">닉네임</Label>
+                            <div className="relative group">
+                                <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-emerald-400 group-focus-within:text-emerald-600 transition-colors" />
+                                <Input
+                                    id="nickname"
+                                    placeholder="멋진 정원사 닉네임"
+                                    value={nickname}
+                                    onChange={(e) => setNickname(e.target.value)}
                                     className="pl-10 border-emerald-100 focus:border-emerald-400 focus:ring-emerald-400 bg-white/50"
                                     required
                                 />

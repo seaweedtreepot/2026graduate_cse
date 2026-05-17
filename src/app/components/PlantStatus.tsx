@@ -30,7 +30,7 @@ interface StatusViewProps { setError: (val: boolean) => void; }
 export function StatusView({ setError }: StatusViewProps) {
   const [searchParams] = useSearchParams();
 
-  const plantId = searchParams.get('id');
+  const plantId = searchParams.get('plantId');
   const plantName = searchParams.get('plant') || '바질';
 
   const [showCamera, setShowCamera] = useState(false);
@@ -51,13 +51,6 @@ export function StatusView({ setError }: StatusViewProps) {
     { icon: AlertTriangle, label: '질병', value: 'good', currentValue: '정상', unit: '' },
   ]);
 
-  // 3. [추가] 서버의 숫자 데이터를 'good' 등으로 변환해주는 도구 (함수)
-  const determineStatus = (label: string, value: number): 'good' | 'warning' | 'critical' => {
-    if (label === '벌레' || label === '질병') return value > 0 ? 'critical' : 'good';
-    if (label === '습도') return value < 30 ? 'critical' : value < 60 ? 'warning' : 'good';
-    if (label === '온도') return (value < 15 || value > 30) ? 'critical' : 'good';
-    return 'good';
-  };
 
   // 2. 기존 growthProgress 상태는 지우고 이걸 넣으세요
   const [currentLevel, setCurrentLevel] = useState<number>(Number(searchParams.get('level')) || 1);
@@ -80,72 +73,75 @@ export function StatusView({ setError }: StatusViewProps) {
   ];
 
   const fetchStatus = async () => {
-    if (!plantId) return; // plantId가 없으면 실행 안 함
+    if (!plantId) return;
 
     try {
-      // 1. 백엔드 API 호출
-      const res = await api.get(`/plants/${plantId}/status`);
+      // 1. 백엔드 API 호출 (최신 센서 및 상태 데이터 가져오기)
+      const res = await api.get(`/plants/${plantId}/sensors/latest`);
       const data = res.data;
-      console.log("🚀 백엔드에서 도착한 데이터:", data);
+      console.log("🚀 백엔드에서 도착한 센서 데이터:", data);
 
-      // 2. 서버에서 준 레벨이 있다면 즉시 업데이트
+      // 2. 서버에서 식물 레벨(level)을 같이 주면 즉시 업데이트
+      // (백엔드 명세에 따라 level 필드가 없을 수도 있으므로 옵셔널 처리)
       if (data.level) {
         setCurrentLevel(data.level);
       }
 
-      // 3. [핵심] 중복 선언을 없애고, 실측값(currentValue)과 상태(value)를 한 번에 매핑
+      // 3. 백엔드의 { value, status } 구조를 프론트엔드 UI 카드에 맞게 매핑
       const updatedData: StatusIndicator[] = [
         {
           icon: Droplets,
           label: '습도',
-          currentValue: data.humidity || 0,
+          currentValue: data.moisture?.value ?? 0,
           unit: '%',
-          value: determineStatus('습도', data.humidity || 0)
+          value: data.moisture?.status ?? 'good'  // 백엔드가 준 status (good/warning/critical) 직접 사용
         },
         {
           icon: Thermometer,
           label: '온도',
-          currentValue: data.temp || 0,
+          currentValue: data.temperature?.value ?? 0,
           unit: '°C',
-          value: determineStatus('온도', data.temp || 0)
+          value: data.temperature?.status ?? 'good'
         },
         {
           icon: Sun,
           label: '조도',
-          currentValue: data.light || 0,
+          currentValue: data.light?.value ?? 0,
           unit: 'lux',
-          value: determineStatus('조도', data.light || 0)
+          value: data.light?.status ?? 'good'
         },
         {
           icon: Sprout,
           label: '흙의 상태',
-          currentValue: data.soil || 0,
-          unit: '%',
-          value: 'good' // 필요 시 determineStatus 추가
+          currentValue: data.soil?.value ?? '정상', // '건조함' 등 문자열이 들어옴
+          unit: '', // 문자열 자체가 값이므로 단위(unit)는 비워둠
+          value: data.soil?.status ?? 'good'
         },
         {
           icon: Bug,
           label: '벌레',
-          currentValue: data.bugs || 0,
-          unit: '마리',
-          value: determineStatus('벌레', data.bugs || 0)
+          // 💡 Boolean(true/false) 값을 사용자가 읽기 편한 한국어로 변환
+          currentValue: data.bug?.value ? '발견됨' : '없음',
+          unit: '',
+          value: data.bug?.status ?? 'good'
         },
         {
           icon: AlertTriangle,
           label: '질병',
-          currentValue: data.disease > 0 ? '위험' : '정상',
+          currentValue: data.disease?.value ?? '없음', // '탄저병', '없음' 등 문자열이 들어옴
           unit: '',
-          value: determineStatus('질병', data.disease || 0)
+          value: data.disease?.status ?? 'good'
         },
       ];
 
-      // 4. 상태 저장
+      // 4. 리액트 상태(State)에 저장하여 화면에 랜더링
       setStatusData(updatedData);
       setLastUpdated(new Date().toLocaleTimeString('ko-KR'));
       setError(false);
 
     } catch (err) {
-      console.error("데이터 호출 실패:", err);
+      console.error("❌ 최신 상태 데이터 호출 실패:", err);
+      // 에러 발생 시 UI에 에러 상태 표시 (에러 방어벽)
       setError(true);
     }
   };
@@ -294,14 +290,15 @@ export function StatusView({ setError }: StatusViewProps) {
   const backgroundStyle = getBackgroundStyle();
 
   const handleLightToggle = async () => {
+    console.log("🚀 버튼 클릭됨! 현재 plantId는:", plantId);
     if (!plantId) return;
 
-    // 다음 상태 결정 (켜져 있으면 끄기, 꺼져 있으면 켜기)
-    const nextStatus = isLighting ? "off" : "on";
+    // 💡 1. [수정] 백엔드 명세서에 맞게 상태값을 대문자 "OFF" / "ON"으로 변경
+    const nextStatus = isLighting ? "OFF" : "ON";
 
     try {
-      // 백엔드에 현재 필요한 상태 전송
-      const res = await api.post(`/plants/${plantId}/control/light`, {
+      // 💡 2. [수정] API 엔드포인트 주소를 'light'에서 'led'로 변경
+      const res = await api.post(`/plants/${plantId}/control/led`, {
         status: nextStatus
       });
 
@@ -312,7 +309,8 @@ export function StatusView({ setError }: StatusViewProps) {
       }
     } catch (err) {
       console.error("제어 실패:", err);
-      alert(`햇빛을 ${nextStatus === 'on' ? '켜는' : '끄는'} 데 실패했습니다.`);
+      // 알림창 조건문도 대문자 'ON' 기준으로 맞춤
+      alert(`햇빛을 ${nextStatus === 'ON' ? '켜는' : '끄는'} 데 실패했습니다.`);
     }
   };
 
@@ -320,13 +318,34 @@ export function StatusView({ setError }: StatusViewProps) {
   const handleCapture = async () => {
     if (!plantId) return;
     setIsCapturing(true);
+
     try {
+      // 1. 백엔드에 캡처 요청 (서버가 사진을 찍고 클라우드에 올림)
       const res = await api.post(`/plants/${plantId}/cam/capture`);
-      console.log("캡처 성공:", res.data);
-      alert('스냅샷이 갤러리에 저장되었습니다!');
+      const { imageUrl } = res.data; // 서버가 준 이미지 주소 추출
+
+      if (!imageUrl) throw new Error("이미지 주소가 없습니다.");
+
+      // 2. 💡 [핵심] 이미지 URL을 블롭(Blob) 데이터로 변환하여 폰에 다운로드 트리거
+      const imageResponse = await fetch(imageUrl);
+      const blob = await imageResponse.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+
+      // 가상의 다운로드 링크 생성 및 클릭
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `${plantName}_홈캠_${new Date().toISOString().split('T')[0]}.jpg`; // 폰에 저장될 파일명
+      document.body.appendChild(link);
+      link.click();
+
+      // 링크 제거 및 메모리 정리
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+
+      alert('📸 사진이 내 기기(다운로드 폴더/갤러리)에 저장되었습니다!');
     } catch (err) {
-      console.error("캡처 실패:", err);
-      alert('캡처에 실패했습니다. 카메라 상태를 확인해주세요.');
+      console.error("캡처 또는 기기 다운로드 실패:", err);
+      alert('캡처에는 성공했으나, 내 폰에 저장하는 과정에서 오류가 발생했습니다.');
     } finally {
       setIsCapturing(false);
     }

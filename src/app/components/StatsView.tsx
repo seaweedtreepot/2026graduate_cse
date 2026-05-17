@@ -10,13 +10,14 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../api/axios';
 
+// 상단 SENSOR_TYPES 배열에 unit 추가
 const SENSOR_TYPES = [
-    { id: 'moisture', label: '습도', icon: Droplets, color: '#10b981' },
-    { id: 'light', label: '조도', icon: Sun, color: '#f59e0b' },
-    { id: 'soil', label: '흙의 상태', icon: Sprout, color: '#059669' },
-    { id: 'bug', label: '벌레', icon: Bug, color: '#64748b' },
-    { id: 'temperature', label: '온도', icon: Thermometer, color: '#ef4444' },
-    { id: 'disease', label: '질병', icon: AlertTriangle, color: '#a855f7' },
+    { id: 'moisture', label: '습도', icon: Droplets, color: '#10b981', unit: '%' },
+    { id: 'light', label: '조도', icon: Sun, color: '#f59e0b', unit: 'lux' },
+    { id: 'soil', label: '흙의 상태', icon: Sprout, color: '#059669', unit: '%' },
+    { id: 'bug', label: '벌레', icon: Bug, color: '#64748b', unit: '마리' },
+    { id: 'temperature', label: '온도', icon: Thermometer, color: '#ef4444', unit: '°C' },
+    { id: 'disease', label: '질병', icon: AlertTriangle, color: '#a855f7', unit: '' },
 ];
 
 interface HistoryData {
@@ -31,7 +32,7 @@ interface StatsViewProps {
 
 export function StatsView({ setError }: StatsViewProps) {
     const [searchParams] = useSearchParams();
-    const plantId = searchParams.get('id');
+    const plantId = searchParams.get('plantId');
 
     const [historyData, setHistoryData] = useState<HistoryData[]>([]);
     const [selectedType, setSelectedType] = useState('moisture');
@@ -46,6 +47,7 @@ export function StatsView({ setError }: StatsViewProps) {
 
     const fetchHistory = async () => {
         if (!plantId) return;
+
         setIsLoading(true);
         try {
             const res = await api.get(`/plants/${plantId}/sensors/history`, {
@@ -56,6 +58,8 @@ export function StatsView({ setError }: StatsViewProps) {
                 }
             });
             setHistoryData(res.data);
+            console.log("📦 Axios 응답 전체 객체:", res);
+            console.log("👀 실제 서버가 준 알맹이 (res.data):", res.data);
             setError(false);
         } catch (err) {
             console.error("기록 조회 실패:", err);
@@ -154,7 +158,7 @@ export function StatsView({ setError }: StatsViewProps) {
                                     <CardDescription className="text-emerald-400 font-black uppercase text-[10px] tracking-widest">Selected Average</CardDescription>
                                     <CardTitle className="text-5xl font-black tracking-tighter flex items-baseline gap-1">
                                         {averageValue}
-                                        <span className="text-lg font-bold text-emerald-400/60">%</span>
+                                        <span className="text-lg font-bold text-emerald-400/60">{activeSensor.unit}</span>
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="relative z-10">
@@ -264,7 +268,7 @@ export function StatsView({ setError }: StatsViewProps) {
                                                     return (
                                                         <div className="bg-emerald-900 text-white p-4 rounded-2xl shadow-2xl border-none backdrop-blur-lg">
                                                             <p className="text-[10px] font-black text-emerald-400 uppercase mb-1">{new Date(label).toLocaleString()}</p>
-                                                            <p className="text-lg font-black">{payload[0].value}<span className="text-xs ml-0.5 opacity-70">%</span></p>
+                                                            <p className="text-lg font-black">{payload[0].value}<span className="text-xs ml-0.5 opacity-70">{activeSensor.unit}</span></p>
                                                         </div>
                                                     );
                                                 }

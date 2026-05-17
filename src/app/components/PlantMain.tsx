@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sidebar } from './Sidebar';
+import { Sidebar } from './SideBar';
 import { StatusView } from './PlantStatus';
 import { StatsView } from './StatsView';
 import { GuideView } from './GuideView';

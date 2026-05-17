@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router'; // 또는 'react-router'
-import api from '../api/axios';
+import { publicApi } from '../api/axios';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -13,14 +13,16 @@ export function LoginForm() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setErrorMessage('');
 
     try {
-      const response = await api.post('/auth/login', {
-        email,
+      const response = await publicApi.post('/auth/login', {
+        email: email.trim(),
         password,
       });
 
@@ -30,8 +32,14 @@ export function LoginForm() {
 
       // 로그인 성공 후 식물 목록 화면으로 이동
       navigate('/plant-list');
-    } catch (error) {
+    } catch (error: any) {
       console.error('로그인 에러:', error);
+      // 📍 추가: 백엔드에서 보내주는 에러 메시지가 있다면 그걸 쓰고, 없다면 기본 메시지 출력
+      if (error.response && error.response.data && error.response.data.message) {
+        setErrorMessage(error.response.data.message);
+      } else {
+        setErrorMessage('오류가 발생했습니다.');
+      }
       // 여기에 에러 알림(Toast 등)을 추가하면 더 좋습니다.
     } finally {
       setIsLoading(false);
@@ -64,6 +72,11 @@ export function LoginForm() {
         </CardHeader>
 
         <CardContent>
+          {errorMessage && (
+            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg">
+              {errorMessage}
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-4">
               {/* 이메일 입력 섹션 */}
