@@ -118,7 +118,11 @@ export function PlantList() {
                 // 🌐 케이스 2: 일반 PC/모바일 웹 브라우저 환경일 때
                 else {
                     console.log("🌐 웹 브라우저 환경 푸시 알림 세팅 기동");
-
+                    // 🛡️ [안전장치 추가] messaging 객체가 생성되지 않았다면 웹 푸시 로직을 스킵합니다.
+                    if (!messaging) {
+                        console.log("⚠️ 현재 환경에서는 웹 FCM 메시징을 사용할 수 없습니다.");
+                        return;
+                    }
                     if (Notification.permission === 'granted') {
                         const token = await getToken(messaging, {
                             vapidKey: 'BN-4-rDMQp_55ccwsKQNpzRLk-WD5H5zlQLTE6CHVbhuZdAkmCMtLF2p6SdIxJJOW0f4wUWHFxPII0vHmVHJ0DU'

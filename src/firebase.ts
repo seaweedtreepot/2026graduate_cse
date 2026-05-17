@@ -1,12 +1,8 @@
-// src/firebase.ts
 import { initializeApp } from "firebase/app";
-import { getMessaging, getToken, onMessage } from "firebase/messaging";
+import { getMessaging, getToken, onMessage, isSupported } from "firebase/messaging";
 import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
 
 // Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
     apiKey: "AIzaSyDtFTrz5EKv9qsd6b_jyUY2sfGypfVzy1Q",
     authDomain: "greenmate-7b029.firebaseapp.com",
@@ -19,8 +15,17 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
 
-const messaging = getMessaging(app);
+// Analytics 안전장치 (웹 환경에서만 작동하도록 보장)
+const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 
-export { messaging, getToken, onMessage };
+// 🚨 [핵심 수정 구역] iOS 앱 크래시 방지용 변수 선언
+let messaging: any = null;
+
+// 브라우저 환경이면서 'Service Worker'를 지원하는 환경(즉, 일반 웹)에서만 실행합니다.
+// 아이폰 앱(Capacitor) 환경에서는 serviceWorker가 없으므로 이 if문을 건너뛰어 안전합니다!
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+    messaging = getMessaging(app);
+}
+
+export { messaging, getToken, onMessage, isSupported };
