@@ -3,7 +3,7 @@ import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
-import { Sprout, Plus, Activity, Leaf, Sparkles, AlertCircle, WifiOff, RefreshCw, Skull, Archive, X, Info, Bell } from 'lucide-react';
+import { Sprout, Plus, Activity, Leaf, Sparkles, AlertCircle, WifiOff, RefreshCw, Skull, Archive, X, Info, Bell, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../api/axios';
 import { UserContext } from '../context/UserContext';
@@ -46,6 +46,8 @@ export function PlantList() {
     const [selectedReport, setSelectedReport] = useState<DeathReport | null>(null);
     const [isReportLoading, setIsReportLoading] = useState(false);
     const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unknown'>('unknown');
+    const [deleteTarget, setDeleteTarget] = useState<Plant | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     // 마운트 시 현재 권한 상태 확인
     useEffect(() => {
@@ -121,6 +123,21 @@ export function PlantList() {
     useEffect(() => {
         fetchPlants();
     }, []);
+
+    const handleDeleteConfirm = async () => {
+        if (!deleteTarget) return;
+        setIsDeleting(true);
+        try {
+            await api.delete(`/plants/${deleteTarget.plantId}`);
+            setPlants(prev => prev.filter(p => p.plantId !== deleteTarget.plantId));
+            setDeleteTarget(null);
+        } catch (err) {
+            console.error('식물 삭제 실패:', err);
+            alert('식물 삭제에 실패했습니다. 잠시 후 다시 시도해주세요.');
+        } finally {
+            setIsDeleting(false);
+        }
+    };
 
     // 자동 등록 — 이미 granted인 경우에만 토큰 재발급
     useEffect(() => {
@@ -239,7 +256,15 @@ export function PlantList() {
                 </AnimatePresence>
 
                 {/* 헤더 */}
-                <header className="pt-4 flex flex-col items-center text-center">
+                <header className="pt-4 flex flex-col items-center text-center relative">
+                    {/* 알림 이력 버튼 */}
+                    <button
+                        onClick={() => navigate('/notifications')}
+                        className="absolute right-0 top-4 p-3 bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border border-white/60 hover:bg-white/90 transition-all active:scale-95"
+                        title="알림 이력 보기"
+                    >
+                        <Bell className="size-5 text-emerald-700" />
+                    </button>
                     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center">
                         <div className="flex items-center gap-2 mb-3 bg-white/40 px-4 py-1 rounded-full border border-white/60 shadow-sm">
                             <Leaf className="size-3.5 text-emerald-600" />
@@ -325,6 +350,17 @@ export function PlantList() {
                                             <div className="absolute top-6 left-8 text-[10px] font-black text-emerald-800/20 uppercase tracking-widest">
                                                 Level {plant.level}
                                             </div>
+                                            {/* 삭제 버튼 (호버 시 노출) */}
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setDeleteTarget(plant);
+                                                }}
+                                                className="absolute top-4 right-4 p-2 rounded-xl opacity-0 group-hover:opacity-100 bg-rose-50 text-rose-400 hover:text-rose-600 hover:bg-rose-100 transition-all duration-200 z-10"
+                                                title="식물 삭제"
+                                            >
+                                                <Trash2 className="size-4" />
+                                            </button>
                                             <div className="relative w-36 h-36 mb-6">
                                                 <div className={`absolute inset-0 rounded-full blur-2xl scale-75 opacity-0 group-hover:opacity-100 transition-all ${isDead ? 'bg-slate-300' : 'bg-emerald-100/40'}`} />
                                                 <img
@@ -383,6 +419,59 @@ export function PlantList() {
                                     </div>
                                 </div>
                                 <Button onClick={() => setSelectedReport(null)} className="w-full py-6 rounded-2xl bg-slate-800 text-white font-black text-lg">기억할게요</Button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* 식물 삭제 확인 모달 */}
+            <AnimatePresence>
+                {deleteTarget && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-emerald-950/40 backdrop-blur-md">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                            className="relative w-full max-w-sm bg-white rounded-[2.5rem] shadow-2xl overflow-hidden"
+                        >
+                            <div className="h-2 w-full bg-rose-400" />
+                            <button
+                                onClick={() => setDeleteTarget(null)}
+                                className="absolute top-6 right-6 p-2 bg-slate-100 rounded-full text-slate-400 hover:bg-slate-200 transition-colors"
+                            >
+                                <X className="size-5" />
+                            </button>
+                            <div className="p-8 space-y-6">
+                                <div className="flex flex-col items-center text-center">
+                                    <div className="p-4 bg-rose-100 rounded-full mb-4">
+                                        <Trash2 className="size-8 text-rose-400" />
+                                    </div>
+                                    <h2 className="text-2xl font-black text-slate-800 tracking-tighter">정말 삭제할까요?</h2>
+                                    <p className="text-sm font-medium text-slate-500 mt-2">
+                                        <span className="font-black text-emerald-700">{deleteTarget.name}</span>을(를) 정원에서 제거합니다.<br />
+                                        이 작업은 되돌릴 수 없어요.
+                                    </p>
+                                </div>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => setDeleteTarget(null)}
+                                        className="flex-1 py-4 rounded-2xl bg-slate-100 text-slate-700 font-black hover:bg-slate-200 transition-colors"
+                                    >
+                                        취소
+                                    </button>
+                                    <button
+                                        onClick={handleDeleteConfirm}
+                                        disabled={isDeleting}
+                                        className="flex-1 py-4 rounded-2xl bg-rose-500 text-white font-black hover:bg-rose-600 disabled:opacity-60 transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        {isDeleting ? (
+                                            <><div className="size-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> 삭제 중...</>
+                                        ) : (
+                                            <><Trash2 className="size-4" /> 삭제하기</>
+                                        )}
+                                    </button>
+                                </div>
                             </div>
                         </motion.div>
                     </div>

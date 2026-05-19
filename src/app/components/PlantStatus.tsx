@@ -140,8 +140,17 @@ export function StatusView({ setError }: StatusViewProps) {
       setError(false);
 
     } catch (err) {
-      console.error("❌ 최신 상태 데이터 호출 실패:", err);
-      // 에러 발생 시 UI에 에러 상태 표시 (에러 방어벽)
+      console.warn("⚠️ 센서 API 미연결 → 더미 데이터 사용:", err);
+      // API 미연결 시 데모용 더미 데이터 (warning 배경 체험)
+      const dummyData: StatusIndicator[] = [
+        { icon: Droplets, label: '습도', currentValue: 65, unit: '%', value: 'good' },
+        { icon: Thermometer, label: '온도', currentValue: 28, unit: '°C', value: 'warning' },
+        { icon: Sun, label: '조도', currentValue: 320, unit: 'lux', value: 'warning' },
+        { icon: Sprout, label: '흙의 상태', currentValue: '건조함', unit: '', value: 'critical' },
+        { icon: Bug, label: '벌레', currentValue: '없음', unit: '', value: 'good' },
+        { icon: AlertTriangle, label: '질병', currentValue: '정상', unit: '', value: 'good' },
+      ];
+      setStatusData(dummyData);
       setError(true);
     }
   };
@@ -278,11 +287,23 @@ export function StatusView({ setError }: StatusViewProps) {
 
   // 배경 스타일 결정
   const getBackgroundStyle = () => {
+    const criticalCount = statusData.filter((s: StatusIndicator) => s.value === 'critical').length;
+    const warningCount = statusData.filter((s: StatusIndicator) => s.value === 'warning').length;
 
-    // 건강한 상태
+    if (criticalCount > 0) {
+      return {
+        gradient: 'from-rose-300 via-orange-100 to-amber-200',
+        description: 'critical',
+      };
+    }
+    if (warningCount > 0) {
+      return {
+        gradient: 'from-amber-200 via-yellow-50 to-lime-100',
+        description: 'warning',
+      };
+    }
     return {
       gradient: 'from-sky-200 via-emerald-100 to-emerald-200',
-      overlay: 'rgba(34, 197, 94, 0.1)',
       description: 'healthy',
     };
   };
@@ -479,9 +500,9 @@ export function StatusView({ setError }: StatusViewProps) {
           )}
         </AnimatePresence>
 
+        {/* ── healthy: 초록 나무 + 잎사귀 ── */}
         {backgroundStyle.description === 'healthy' && (
           <>
-            {/* 건강한 나무 실루엣 */}
             <motion.div
               className="absolute bottom-0 left-0 right-0 h-64 bg-gradient-to-t from-green-800/40 to-transparent"
               style={{ x: smoothMouseX }}
@@ -491,32 +512,97 @@ export function StatusView({ setError }: StatusViewProps) {
               <div className="absolute bottom-0 right-40 w-24 h-52 bg-green-900/35 rounded-t-full" />
               <div className="absolute bottom-0 right-10 w-16 h-44 bg-green-900/30 rounded-t-full" />
             </motion.div>
-
-            {/* 떠다니는 잎사귀들 */}
             {[...Array(5)].map((_, i) => (
               <motion.div
                 key={i}
                 className="absolute text-2xl"
-                initial={{
-                  x: Math.random() * window.innerWidth,
-                  y: -50,
-                  rotate: 0
-                }}
-                animate={{
-                  y: window.innerHeight + 50,
-                  rotate: 360,
-                  x: Math.random() * window.innerWidth,
-                }}
-                transition={{
-                  duration: 10 + Math.random() * 10,
-                  repeat: Infinity,
-                  delay: i * 2,
-                  ease: 'linear',
-                }}
+                initial={{ x: Math.random() * window.innerWidth, y: -50, rotate: 0 }}
+                animate={{ y: window.innerHeight + 50, rotate: 360, x: Math.random() * window.innerWidth }}
+                transition={{ duration: 10 + Math.random() * 10, repeat: Infinity, delay: i * 2, ease: 'linear' }}
               >
                 🍃
               </motion.div>
             ))}
+          </>
+        )}
+
+        {/* ── warning: 황금 햇살 글로우 + 느리게 흔들리는 꽃잎 ── */}
+        {backgroundStyle.description === 'warning' && (
+          <>
+            {/* 중앙 태양 글로우 */}
+            <motion.div
+              animate={{ scale: [1, 1.15, 1], opacity: [0.25, 0.45, 0.25] }}
+              transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute top-[-5%] left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-amber-300/30 blur-[100px]"
+            />
+            {/* 바닥 풀밭 톤 */}
+            <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-yellow-700/20 to-transparent" />
+            {/* 떨어지는 꽃잎 */}
+            {[...Array(6)].map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute text-xl opacity-70"
+                initial={{ x: Math.random() * window.innerWidth, y: -40, rotate: 0, scale: 0.8 }}
+                animate={{
+                  y: window.innerHeight + 40,
+                  rotate: 720,
+                  x: Math.random() * window.innerWidth,
+                  scale: [0.8, 1.2, 0.8],
+                }}
+                transition={{ duration: 8 + Math.random() * 8, repeat: Infinity, delay: i * 1.5, ease: 'easeInOut' }}
+              >
+                🌼
+              </motion.div>
+            ))}
+            {/* 구름 실루엣 */}
+            <motion.div
+              animate={{ x: ['-5%', '5%', '-5%'] }}
+              transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute top-16 left-[-5%] text-6xl opacity-10"
+            >☁️</motion.div>
+            <motion.div
+              animate={{ x: ['5%', '-5%', '5%'] }}
+              transition={{ duration: 15, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute top-24 right-[-5%] text-5xl opacity-10"
+            >☁️</motion.div>
+          </>
+        )}
+
+        {/* ── critical: 붉은 긴급 경고 글로우 + 빠른 파티클 ── */}
+        {backgroundStyle.description === 'critical' && (
+          <>
+            {/* 붉은 pulse 글로우 */}
+            <motion.div
+              animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.5, 0.2] }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] rounded-full bg-rose-400/20 blur-[120px]"
+            />
+            {/* 가장자리 붉은 vignetted glow */}
+            <div className="absolute inset-0 bg-gradient-to-b from-rose-400/10 via-transparent to-rose-500/15 pointer-events-none" />
+            {/* 바닥 어두운 그라운드 */}
+            <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-rose-900/25 to-transparent" />
+            {/* 빠르게 흔들리는 경고 파티클 */}
+            {[...Array(5)].map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute text-lg opacity-40"
+                initial={{ x: Math.random() * window.innerWidth, y: window.innerHeight + 20 }}
+                animate={{
+                  y: -40,
+                  x: Math.random() * window.innerWidth,
+                  opacity: [0, 0.5, 0],
+                }}
+                transition={{ duration: 4 + Math.random() * 3, repeat: Infinity, delay: i * 0.8, ease: 'linear' }}
+              >
+                ⚠️
+              </motion.div>
+            ))}
+            {/* 화면 테두리 깜빡임 */}
+            <motion.div
+              animate={{ opacity: [0, 0.08, 0] }}
+              transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute inset-0 border-[6px] border-rose-500/40 rounded-none pointer-events-none"
+            />
           </>
         )}
 
