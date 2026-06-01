@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const BASE_URL = 'http://localhost:8080/api/v1';
+const BASE_URL = typeof window !== 'undefined' && window.location.protocol === 'https:'
+    ? '/api/v1'
+    : `http://${window.location.hostname}:8080/api/v1`;
 
 // 1️⃣ 토큰이 필요 없는 공개 API 전용 인스턴스 (로그인, 회원가입, 비번찾기)
 export const publicApi = axios.create({

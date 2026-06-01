@@ -32,6 +32,16 @@ export default defineConfig({
       filename: 'sw.ts'
     })
   ],
+  server: {
+    allowedHosts: true,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(new URL('.', import.meta.url).pathname, './src'),
