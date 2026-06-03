@@ -54,8 +54,8 @@ export function PlantList() {
         const isNotifSupported = typeof Notification !== 'undefined';
         const currentPermission = isNotifSupported ? Notification.permission : 'N/A';
         
-        // 디버깅용 초기 얼럿
-        alert(`[디버그] 알림 지원 여부: ${isNotifSupported ? '지원함' : '미지원(Notification이 undefined)'}\n현재 권한 상태: ${currentPermission}\n브라우저 환경: ${navigator.userAgent}`);
+        // 디버깅용 초기 로그
+        console.log(`[디버그] 알림 지원 여부: ${isNotifSupported ? '지원함' : '미지원(Notification이 undefined)'}\n현재 권한 상태: ${currentPermission}\n브라우저 환경: ${navigator.userAgent}`);
 
         if (isNotifSupported) {
             setNotifPermission(Notification.permission);
@@ -80,22 +80,22 @@ export function PlantList() {
 
     // 아이폰 Safari PWA — 반드시 사용자 제스처(버튼 클릭)로 호출
     const handleRequestNotificationPermission = async () => {
-        alert("1. 버튼 클릭 확인");
+        console.log("1. 버튼 클릭 확인");
         try {
             if (typeof window === 'undefined' || !('Notification' in window)) {
-                alert("이 브라우저는 Notification API를 지원하지 않습니다. (HTTP 접속 또는 미지원 브라우저/OS일 수 있습니다)");
+                console.warn("이 브라우저는 Notification API를 지원하지 않습니다. (HTTP 접속 또는 미지원 브라우저/OS일 수 있습니다)");
                 return;
             }
-            alert("2. 권한 요청 직전 (Notification.requestPermission)");
+            console.log("2. 권한 요청 직전 (Notification.requestPermission)");
             const permission = await Notification.requestPermission();
-            alert("3. 권한 결과: " + permission);
+            console.log("3. 권한 결과: " + permission);
             setNotifPermission(permission);
 
             if (permission === 'granted') {
                 await registerFcmToken();
             }
         } catch (error: any) {
-            alert("에러 발생: " + error?.message || error);
+            console.error("에러 발생: ", error?.message || error);
             console.error("알림 권한 요청 실패:", error);
         }
     };
@@ -276,9 +276,9 @@ export function PlantList() {
                         onClick={async () => {
                             try {
                                 const res = await api.get('/users/me/fcm-test');
-                                alert("백엔드 전송 완료: " + res.data.status);
+                                console.log("백엔드 전송 완료: " + res.data.status);
                             } catch (e: any) {
-                                alert("테스트 전송 실패: " + (e.response?.data?.message || e.message));
+                                console.error("테스트 전송 실패: " + (e.response?.data?.message || e.message));
                             }
                         }}
                         className="absolute left-0 top-4 p-3 bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border border-white/60 hover:bg-white/90 transition-all active:scale-95 text-xs font-black text-emerald-700"
@@ -394,7 +394,7 @@ export function PlantList() {
                                             <div className="relative w-36 h-36 mb-6">
                                                 <div className={`absolute inset-0 rounded-full blur-2xl scale-75 opacity-0 group-hover:opacity-100 transition-all ${isDead ? 'bg-slate-300' : 'bg-emerald-100/40'}`} />
                                                 <img
-                                                    src={isDead ? `/assets/character/lv${plant.level}_sad.png` : `/assets/character/lv${plant.level}_happy.png`}
+                                                    src={isDead ? `/assets/character/lv1_sad.png` : `/assets/character/lv1_happy.png`}
                                                     className="w-full h-full object-contain relative z-10 transition-transform duration-500 group-hover:scale-110"
                                                     alt={plant.name}
                                                     onError={(e) => {

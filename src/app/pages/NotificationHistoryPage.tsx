@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Bell, AlertTriangle, AlertCircle, CheckCircle2, Leaf, RefreshCw, WifiOff, BellOff } from 'lucide-react';
+import { ArrowLeft, Bell, AlertTriangle, AlertCircle, CheckCircle2, Leaf, RefreshCw, WifiOff, BellOff, Trash2 } from 'lucide-react';
 import api from '../api/axios';
 
 interface Notification {
@@ -49,9 +49,20 @@ const getNotifStyle = (type: Notification['type']) => {
   }
 };
 
+// UTC 날짜 문자열에 타임존 정보(Z 또는 +오프셋)가 누락된 경우를 대비해
+// 안전하게 파싱하는 헬퍼 함수
+const parseSafeDate = (isoString: string) => {
+  if (!isoString) return new Date();
+  // '2026-06-02T11:48:11' 처럼 타임존 정보가 없고 UTC 시간인 경우 'Z'를 추가
+  if (!isoString.endsWith('Z') && !isoString.includes('+')) {
+    return new Date(`${isoString}Z`);
+  }
+  return new Date(isoString);
+};
+
 // 시간 포맷터
 const formatTime = (isoString: string) => {
-  const date = new Date(isoString);
+  const date = parseSafeDate(isoString);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffMin = Math.floor(diffMs / 60000);
@@ -138,13 +149,43 @@ export function NotificationHistoryPage() {
     }
   };
 
+  const clearNotifications = async () => {
+    if (!window.confirm('정말 모든 알림을 비우시겠습니까?')) return;
+    setIsLoading(true);
+    try {
+      await api.delete('/users/me/notifications');
+      setNotifications([]);
+      alert('모든 알림이 성공적으로 삭제되었습니다.');
+    } catch (err: any) {
+      console.error('알림 비우기 API 실패:', err);
+      const status = err.response?.status;
+      let errorMsg = '알림을 비우는 도중 서버 오류가 발생했습니다.';
+      
+      if (status === 404) {
+        errorMsg = '서버에 알림 삭제 API(DELETE /users/me/notifications)가 구현되어 있지 않거나 경로가 잘못되었습니다. (404 Not Found)';
+      } else if (status === 405) {
+        errorMsg = '서버에서 지원하지 않는 요청 메서드입니다. (405 Method Not Allowed)';
+      } else if (status === 401 || status === 403) {
+        errorMsg = '권한이 만료되었거나 접근할 수 없습니다. (401/403)';
+      } else if (err.message === 'Network Error') {
+        errorMsg = '서버 네트워크 연결에 실패했습니다. 백엔드가 실행 중인지 확인하세요.';
+      }
+      
+      alert(errorMsg);
+      // 개발 중 임시 UI 동기화를 위해 클라이언트 화면에서는 비워지도록 유지
+      setNotifications([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchNotifications();
   }, []);
 
   // 날짜별 그룹핑
   const groupedNotifications = notifications.reduce<Record<string, Notification[]>>((acc, notif) => {
-    const dateKey = new Date(notif.createdAt).toLocaleDateString('ko-KR', {
+    const dateKey = parseSafeDate(notif.createdAt).toLocaleDateString('ko-KR', {
       year: 'numeric', month: 'long', day: 'numeric',
     });
     if (!acc[dateKey]) acc[dateKey] = [];
@@ -153,7 +194,7 @@ export function NotificationHistoryPage() {
   }, {});
 
   return (
-    <div className="min-h-[100dvh] w-full bg-gradient-to-br from-green-50 via-emerald-50 to-teal-100 relative overflow-hidden">
+    <div className="min-h-[100dvh] w-full bg-gradient-to-br from-green-50 via-emerald-50 to-teal-100 relative overflow-y-auto">
       {/* 배경 장식 */}
       <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-green-200/20 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[-10%] w-96 h-96 bg-emerald-200/20 rounded-full blur-3xl pointer-events-none" />
@@ -180,6 +221,15 @@ export function NotificationHistoryPage() {
             </div>
             <h1 className="text-2xl font-black text-emerald-950 tracking-tight">알림 이력</h1>
           </div>
+          {notifications.length > 0 && (
+            <button
+              onClick={clearNotifications}
+              className="p-3 bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border border-white/60 hover:bg-rose-50 hover:text-rose-600 transition-all active:scale-95"
+              title="알림 전체 비우기"
+            >
+              <Trash2 className="size-5 text-rose-500" />
+            </button>
+          )}
           <button
             onClick={fetchNotifications}
             className="p-3 bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border border-white/60 hover:bg-white/90 transition-all active:scale-95"

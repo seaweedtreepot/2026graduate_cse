@@ -667,7 +667,7 @@ export function StatusView({ setError }: StatusViewProps) {
                 alt="반려식물 캐릭터"
                 className="w-100 h-60 object-contain drop-shadow-2xl" // 크기를 소폭 조정해서 비율 최적화
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = `/assets/character/lv${currentLevel}_happy.png`;
+                  (e.target as HTMLImageElement).src = `/assets/character/lv1_happy.png`;
                 }}
               />
             </motion.div>
