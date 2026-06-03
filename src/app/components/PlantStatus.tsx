@@ -40,13 +40,19 @@ export function StatusView({ setError }: StatusViewProps) {
   const [lastUpdated, setLastUpdated] = useState<string>(''); // 마지막 동기화 시간
   const [isLighting, setIsLighting] = useState(false); // 빛 쐬기 애니메이션용
   const [lightComplete, setLightComplete] = useState(false); // 완료 표시용
+  const [isWatering, setIsWatering] = useState(false); // 물주기 애니메이션용
+  const [autoWater, setAutoWater] = useState({ enabled: false, threshold: 30 }); // 스마트 자동 물주기
+  const [autoLight, setAutoLight] = useState({ enabled: false, threshold: 3000 }); // 스마트 자동 햇빛
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalType, setModalType] = useState<'water' | 'light' | null>(null);
+  const [tempThreshold, setTempThreshold] = useState(30); // 모달 내 임시 설정값
 
   // [추가] 실시간 센서 데이터를 담을 상태 변수입니다.
   const [statusData, setStatusData] = useState<StatusIndicator[]>([
-    { icon: Droplets, label: '습도', value: 'good', currentValue: 0, unit: '%' },
-    { icon: Thermometer, label: '온도', value: 'good', currentValue: 0, unit: '°C' },
-    { icon: Sun, label: '조도', value: 'good', currentValue: 0, unit: 'lux' },
     { icon: Sprout, label: '흙의 상태', value: 'good', currentValue: 0, unit: '%' },
+    { icon: Sun, label: '조도', value: 'good', currentValue: 0, unit: 'lux' },
+    { icon: Thermometer, label: '온도', value: 'good', currentValue: 0, unit: '°C' },
+    { icon: Droplets, label: '습도', value: 'good', currentValue: 0, unit: '%' },
     { icon: Bug, label: '벌레', value: 'good', currentValue: 0, unit: '마리' },
     { icon: AlertTriangle, label: '질병', value: 'good', currentValue: '정상', unit: '' },
   ]);
@@ -87,21 +93,28 @@ export function StatusView({ setError }: StatusViewProps) {
         setCurrentLevel(data.level);
       }
 
+      // 💡 자동 제어 설정 상태 바인딩
+      if (data.autoWaterEnabled !== undefined) {
+        setAutoWater({
+          enabled: data.autoWaterEnabled,
+          threshold: data.autoMoistureThreshold ?? 30
+        });
+      }
+      if (data.autoLightEnabled !== undefined) {
+        setAutoLight({
+          enabled: data.autoLightEnabled,
+          threshold: data.autoLightThreshold ?? 3000
+        });
+      }
+
       // 3. 백엔드의 { value, status } 구조를 프론트엔드 UI 카드에 맞게 매핑
       const updatedData: StatusIndicator[] = [
         {
-          icon: Droplets,
-          label: '습도',
-          currentValue: data.moisture?.value ?? 0,
-          unit: '%',
-          value: data.moisture?.status ?? 'good'  // 백엔드가 준 status (good/warning/critical) 직접 사용
-        },
-        {
-          icon: Thermometer,
-          label: '온도',
-          currentValue: data.temperature?.value ?? 0,
-          unit: '°C',
-          value: data.temperature?.status ?? 'good'
+          icon: Sprout,
+          label: '흙의 상태',
+          currentValue: data.soil?.value ?? '정상', // '건조함' 등 문자열이 들어옴
+          unit: '', // 문자열 자체가 값이므로 단위(unit)는 비워둠
+          value: data.soil?.status ?? 'good'
         },
         {
           icon: Sun,
@@ -111,11 +124,18 @@ export function StatusView({ setError }: StatusViewProps) {
           value: data.light?.status ?? 'good'
         },
         {
-          icon: Sprout,
-          label: '흙의 상태',
-          currentValue: data.soil?.value ?? '정상', // '건조함' 등 문자열이 들어옴
-          unit: '', // 문자열 자체가 값이므로 단위(unit)는 비워둠
-          value: data.soil?.status ?? 'good'
+          icon: Thermometer,
+          label: '온도',
+          currentValue: data.temperature?.value ?? 0,
+          unit: '°C',
+          value: data.temperature?.status ?? 'good'
+        },
+        {
+          icon: Droplets,
+          label: '습도',
+          currentValue: data.moisture?.value ?? 0,
+          unit: '%',
+          value: data.moisture?.status ?? 'good'  // 백엔드가 준 status (good/warning/critical) 직접 사용
         },
         {
           icon: Bug,
@@ -140,8 +160,17 @@ export function StatusView({ setError }: StatusViewProps) {
       setError(false);
 
     } catch (err) {
-      console.error("❌ 최신 상태 데이터 호출 실패:", err);
-      // 에러 발생 시 UI에 에러 상태 표시 (에러 방어벽)
+      console.warn("⚠️ 센서 API 미연결 → 더미 데이터 사용:", err);
+      // API 미연결 시 데모용 더미 데이터 (warning 배경 체험)
+      const dummyData: StatusIndicator[] = [
+        { icon: Sprout, label: '흙의 상태', currentValue: '건조함', unit: '', value: 'critical' },
+        { icon: Sun, label: '조도', currentValue: 320, unit: 'lux', value: 'warning' },
+        { icon: Thermometer, label: '온도', currentValue: 28, unit: '°C', value: 'warning' },
+        { icon: Droplets, label: '습도', currentValue: 65, unit: '%', value: 'good' },
+        { icon: Bug, label: '벌레', currentValue: '없음', unit: '', value: 'good' },
+        { icon: AlertTriangle, label: '질병', currentValue: '정상', unit: '', value: 'good' },
+      ];
+      setStatusData(dummyData);
       setError(true);
     }
   };
@@ -278,11 +307,23 @@ export function StatusView({ setError }: StatusViewProps) {
 
   // 배경 스타일 결정
   const getBackgroundStyle = () => {
+    const criticalCount = statusData.filter((s: StatusIndicator) => s.value === 'critical').length;
+    const warningCount = statusData.filter((s: StatusIndicator) => s.value === 'warning').length;
 
-    // 건강한 상태
+    if (criticalCount > 0) {
+      return {
+        gradient: 'from-rose-300 via-orange-100 to-amber-200',
+        description: 'critical',
+      };
+    }
+    if (warningCount > 0) {
+      return {
+        gradient: 'from-amber-200 via-yellow-50 to-lime-100',
+        description: 'warning',
+      };
+    }
     return {
       gradient: 'from-sky-200 via-emerald-100 to-emerald-200',
-      overlay: 'rgba(34, 197, 94, 0.1)',
       description: 'healthy',
     };
   };
@@ -311,6 +352,61 @@ export function StatusView({ setError }: StatusViewProps) {
       console.error("제어 실패:", err);
       // 알림창 조건문도 대문자 'ON' 기준으로 맞춤
       alert(`햇빛을 ${nextStatus === 'ON' ? '켜는' : '끄는'} 데 실패했습니다.`);
+    }
+  };
+
+  const handleWaterToggle = async () => {
+    console.log("🚀 물주기 버튼 클릭됨! 현재 plantId는:", plantId);
+    if (!plantId) return;
+
+    const nextStatus = isWatering ? "OFF" : "ON";
+
+    try {
+      const res = await api.post(`/plants/${plantId}/control/water`, {
+        status: nextStatus
+      });
+
+      if (res.status === 200) {
+        setIsWatering(!isWatering);
+        fetchStatus();
+      }
+    } catch (err) {
+      console.error("물주기 제어 실패:", err);
+      alert(`물주기를 ${nextStatus === 'ON' ? '시작하는' : '중단하는'} 데 실패했습니다.`);
+    }
+  };
+
+  const handleAutoSettingsUpdate = async (type: 'water' | 'light', enabled: boolean, threshold: number) => {
+    if (!plantId) return;
+    try {
+      const endpoint = type === 'water' ? 'auto-water' : 'auto-light';
+      await api.post(`/plants/${plantId}/control/${endpoint}`, { enabled, threshold });
+      
+      if (type === 'water') {
+        setAutoWater({ enabled, threshold });
+      } else {
+        setAutoLight({ enabled, threshold });
+      }
+    } catch (err) {
+      console.error(`${type} 자동화 설정 변경 실패:`, err);
+      // 에러가 나더라도 데모 테스트 및 클라이언트 UI 동기화를 위해 로컬 상태는 강제로 업데이트합니다.
+      if (type === 'water') {
+        setAutoWater({ enabled, threshold });
+      } else {
+        setAutoLight({ enabled, threshold });
+      }
+    }
+  };
+
+  const handleToggleClick = (type: 'water' | 'light', currentEnabled: boolean) => {
+    if (!currentEnabled) {
+      // 꺼진 상태에서 켤 때는 설정 모달 팝업 오픈
+      setModalType(type);
+      setTempThreshold(type === 'water' ? autoWater.threshold : autoLight.threshold);
+      setIsModalOpen(true);
+    } else {
+      // 켜진 상태에서 끌 때는 모달 없이 즉시 반영
+      handleAutoSettingsUpdate(type, false, type === 'water' ? autoWater.threshold : autoLight.threshold);
     }
   };
 
@@ -394,9 +490,9 @@ export function StatusView({ setError }: StatusViewProps) {
 
   const getIndicatorMessage = (label: string, value: 'good' | 'warning' | 'critical') => {
     const messages: Record<string, { good: string; warning: string; critical: string }> = {
-      '습도': { good: '습도가 적당합니다', warning: '습도가 조금 높아요', critical: '물이 부족합니다' },
+      '습도': { good: '대기 습도가 쾌적합니다', warning: '주변이 조금 다습합니다', critical: '주변이 너무 건조합니다' },
       '조도': { good: '빛이 충분합니다', warning: '어두워지고 있어요', critical: '빛이 너무 부족해요' },
-      '흙의 상태': { good: '토양이 건강합니다', warning: '영양분이 마르고 있어요', critical: '흙에 먹을것이 없어요' },
+      '흙의 상태': { good: '토양 수분이 적당합니다', warning: '흙이 조금 건조합니다', critical: '흙이 바짝 말라 물이 필요합니다!' },
       '벌레': { good: '벌레가 없습니다', warning: '벌레가 보입니다', critical: '벌레가 발견되었습니다!' },
       '온도': { good: '온도가 적절합니다', warning: '조금 덥거나 추워요', critical: '온도 조절이 필요합니다' },
       '질병': { good: '상태가 아주 좋습니다', warning: '주의가 필요합니다', critical: '질병이 의심됩니다' },
@@ -412,9 +508,14 @@ export function StatusView({ setError }: StatusViewProps) {
         critical: '광량이 너무 부족합니다! 식물등을 켜거나 밝은 곳으로 즉시 옮겨주세요.'
       },
       '흙의 상태': {
-        good: '토양에 영양분이 충분합니다. 분갈이 걱정 없어요.',
-        warning: '조금 있으면 영양분이 부족해질 것 같아요. 알비료를 준비해주세요.',
-        critical: '흙에 영양분이 전혀 없어요! 액체 비료를 주거나 흙을 갈아줄 때입니다.'
+        good: '현재 토양 수분이 아주 적절합니다. 지금처럼 유지해 주세요.',
+        warning: '흙이 다소 마르고 있습니다. 조만간 물을 줄 준비를 해 주세요.',
+        critical: '흙이 바짝 말라 위험한 상태입니다! 아래 [물주기 시작] 버튼을 눌러 물을 주세요.'
+      },
+      '습도': {
+        good: '주변 공기의 습도가 식물이 자라기에 딱 좋습니다.',
+        warning: '실내가 약간 다습합니다. 환기를 자주 시켜 공기를 순환해 주세요.',
+        critical: '실내가 너무 건조합니다. 분무기로 물을 뿌려주거나 가습기를 켜 주세요.'
       },
       '온도': {
         good: '식물이 딱 좋아하는 온도입니다. 쾌적하네요!',
@@ -479,9 +580,41 @@ export function StatusView({ setError }: StatusViewProps) {
           )}
         </AnimatePresence>
 
+        {/* [추가] 물주기(수분 공급) 효과 레이어 */}
+        <AnimatePresence>
+          {isWatering && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-0"
+            >
+              {/* 전체적인 시원한 푸른 톤 입히기 */}
+              <div className="absolute inset-0 bg-sky-400/10 mix-blend-soft-light" />
+
+              {/* 중앙에서 은은하게 퍼지는 푸른 광원 */}
+              <motion.div
+                animate={{
+                  scale: [1, 1.05, 1],
+                  opacity: [0.2, 0.4, 0.2],
+                }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full bg-sky-200/20 blur-[120px]"
+              />
+
+              {/* 은은하게 흩날리는 물방울 애니메이션 */}
+              <div className="absolute inset-0 pointer-events-none flex justify-center items-center gap-10 text-4xl opacity-20">
+                <motion.div animate={{ y: [-15, 25, -15], opacity: [0.3, 0.8, 0.3] }} transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}>💧</motion.div>
+                <motion.div animate={{ y: [25, -15, 25], opacity: [0.3, 0.8, 0.3] }} transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}>💧</motion.div>
+                <motion.div animate={{ y: [-10, 20, -10], opacity: [0.3, 0.8, 0.3] }} transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}>💧</motion.div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── healthy: 초록 나무 + 잎사귀 ── */}
         {backgroundStyle.description === 'healthy' && (
           <>
-            {/* 건강한 나무 실루엣 */}
             <motion.div
               className="absolute bottom-0 left-0 right-0 h-64 bg-gradient-to-t from-green-800/40 to-transparent"
               style={{ x: smoothMouseX }}
@@ -491,32 +624,97 @@ export function StatusView({ setError }: StatusViewProps) {
               <div className="absolute bottom-0 right-40 w-24 h-52 bg-green-900/35 rounded-t-full" />
               <div className="absolute bottom-0 right-10 w-16 h-44 bg-green-900/30 rounded-t-full" />
             </motion.div>
-
-            {/* 떠다니는 잎사귀들 */}
             {[...Array(5)].map((_, i) => (
               <motion.div
                 key={i}
                 className="absolute text-2xl"
-                initial={{
-                  x: Math.random() * window.innerWidth,
-                  y: -50,
-                  rotate: 0
-                }}
-                animate={{
-                  y: window.innerHeight + 50,
-                  rotate: 360,
-                  x: Math.random() * window.innerWidth,
-                }}
-                transition={{
-                  duration: 10 + Math.random() * 10,
-                  repeat: Infinity,
-                  delay: i * 2,
-                  ease: 'linear',
-                }}
+                initial={{ x: Math.random() * window.innerWidth, y: -50, rotate: 0 }}
+                animate={{ y: window.innerHeight + 50, rotate: 360, x: Math.random() * window.innerWidth }}
+                transition={{ duration: 10 + Math.random() * 10, repeat: Infinity, delay: i * 2, ease: 'linear' }}
               >
                 🍃
               </motion.div>
             ))}
+          </>
+        )}
+
+        {/* ── warning: 황금 햇살 글로우 + 느리게 흔들리는 꽃잎 ── */}
+        {backgroundStyle.description === 'warning' && (
+          <>
+            {/* 중앙 태양 글로우 */}
+            <motion.div
+              animate={{ scale: [1, 1.15, 1], opacity: [0.25, 0.45, 0.25] }}
+              transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute top-[-5%] left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-amber-300/30 blur-[100px]"
+            />
+            {/* 바닥 풀밭 톤 */}
+            <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-yellow-700/20 to-transparent" />
+            {/* 떨어지는 꽃잎 */}
+            {[...Array(6)].map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute text-xl opacity-70"
+                initial={{ x: Math.random() * window.innerWidth, y: -40, rotate: 0, scale: 0.8 }}
+                animate={{
+                  y: window.innerHeight + 40,
+                  rotate: 720,
+                  x: Math.random() * window.innerWidth,
+                  scale: [0.8, 1.2, 0.8],
+                }}
+                transition={{ duration: 8 + Math.random() * 8, repeat: Infinity, delay: i * 1.5, ease: 'easeInOut' }}
+              >
+                🌼
+              </motion.div>
+            ))}
+            {/* 구름 실루엣 */}
+            <motion.div
+              animate={{ x: ['-5%', '5%', '-5%'] }}
+              transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute top-16 left-[-5%] text-6xl opacity-10"
+            >☁️</motion.div>
+            <motion.div
+              animate={{ x: ['5%', '-5%', '5%'] }}
+              transition={{ duration: 15, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute top-24 right-[-5%] text-5xl opacity-10"
+            >☁️</motion.div>
+          </>
+        )}
+
+        {/* ── critical: 붉은 긴급 경고 글로우 + 빠른 파티클 ── */}
+        {backgroundStyle.description === 'critical' && (
+          <>
+            {/* 붉은 pulse 글로우 */}
+            <motion.div
+              animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.5, 0.2] }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] rounded-full bg-rose-400/20 blur-[120px]"
+            />
+            {/* 가장자리 붉은 vignetted glow */}
+            <div className="absolute inset-0 bg-gradient-to-b from-rose-400/10 via-transparent to-rose-500/15 pointer-events-none" />
+            {/* 바닥 어두운 그라운드 */}
+            <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-rose-900/25 to-transparent" />
+            {/* 빠르게 흔들리는 경고 파티클 */}
+            {[...Array(5)].map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute text-lg opacity-40"
+                initial={{ x: Math.random() * window.innerWidth, y: window.innerHeight + 20 }}
+                animate={{
+                  y: -40,
+                  x: Math.random() * window.innerWidth,
+                  opacity: [0, 0.5, 0],
+                }}
+                transition={{ duration: 4 + Math.random() * 3, repeat: Infinity, delay: i * 0.8, ease: 'linear' }}
+              >
+                ⚠️
+              </motion.div>
+            ))}
+            {/* 화면 테두리 깜빡임 */}
+            <motion.div
+              animate={{ opacity: [0, 0.08, 0] }}
+              transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute inset-0 border-[6px] border-rose-500/40 rounded-none pointer-events-none"
+            />
           </>
         )}
 
@@ -581,7 +779,7 @@ export function StatusView({ setError }: StatusViewProps) {
                 alt="반려식물 캐릭터"
                 className="w-100 h-60 object-contain drop-shadow-2xl" // 크기를 소폭 조정해서 비율 최적화
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = `/assets/character/lv${currentLevel}_happy.png`;
+                  (e.target as HTMLImageElement).src = `/assets/character/lv1_happy.png`;
                 }}
               />
             </motion.div>
@@ -679,6 +877,7 @@ export function StatusView({ setError }: StatusViewProps) {
             const colors = getStatusColor(status.value);
             const StatusBadgeIcon = colors.icon;
             const isLightCard = status.label === '조도';
+            const isWaterCard = status.label === '흙의 상태';
 
             return (
               <motion.div
@@ -725,26 +924,137 @@ export function StatusView({ setError }: StatusViewProps) {
                         className="mt-4 pt-4 border-t border-black/5"
                       >
                         {isLightCard ? (
-                          /* 조도 카드: 현재 상태에 따라 버튼이 변함 */
-                          <Button
-                            onClick={handleLightToggle}
-                            className={`w-full font-bold h-11 rounded-xl transition-all ${isLighting
-                              ? 'bg-slate-200 hover:bg-slate-300 text-slate-700' // 꺼짐 버튼 스타일
-                              : 'bg-yellow-500 hover:bg-yellow-600 text-white shadow-md' // 켜짐 버튼 스타일
-                              }`}
-                          >
-                            {isLighting ? (
-                              <>
-                                <div className="size-4 border-2 border-slate-400 border-t-slate-600 rounded-full animate-spin mr-2" />
-                                인공 햇빛 끄기
-                              </>
-                            ) : (
-                              <>
-                                <Sun className="size-4 mr-2" />
-                                인공 햇빛 켜기
-                              </>
-                            )}
-                          </Button>
+                          /* 조도 카드: 수동 버튼 + 자동 모드 패널 */
+                          <div className="space-y-4">
+                            <Button
+                              onClick={handleLightToggle}
+                              disabled={autoLight.enabled}
+                              className={`w-full font-bold h-11 rounded-xl transition-all ${isLighting
+                                ? 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+                                : 'bg-yellow-500 hover:bg-yellow-600 text-white shadow-md'
+                                } ${autoLight.enabled ? 'opacity-55 cursor-not-allowed' : ''}`}
+                            >
+                              {isLighting ? (
+                                <>
+                                  <div className="size-4 border-2 border-slate-400 border-t-slate-600 rounded-full animate-spin mr-2" />
+                                  인공 햇빛 끄기
+                                </>
+                              ) : (
+                                <>
+                                  <Sun className="size-4 mr-2" />
+                                  인공 햇빛 켜기
+                                </>
+                              )}
+                            </Button>
+
+                            <div className="bg-white/40 p-4 rounded-2xl border border-white/50 space-y-3 shadow-sm">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <span className="text-xs font-black text-slate-800 block">스마트 자동 햇빛</span>
+                                  <span className="text-[9px] text-slate-500 font-bold block">조도가 낮아지면 자동으로 켭니다</span>
+                                </div>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={autoLight.enabled}
+                                    onChange={() => handleToggleClick('light', autoLight.enabled)}
+                                    className="sr-only peer"
+                                  />
+                                  <div className="w-9 h-5 bg-slate-300/60 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-yellow-500"></div>
+                                </label>
+                              </div>
+
+                              {autoLight.enabled && (
+                                <motion.div
+                                  initial={{ opacity: 0, height: 0 }}
+                                  animate={{ opacity: 1, height: 'auto' }}
+                                  className="space-y-2 pt-2 border-t border-black/5"
+                                >
+                                  <div className="flex justify-between text-[10px] font-bold text-slate-700">
+                                    <span>임계 광량 설정</span>
+                                    <span className="text-yellow-600">{autoLight.threshold} lux 이하</span>
+                                  </div>
+                                  <input
+                                    type="range"
+                                    min="2500"
+                                    max="6000"
+                                    step="50"
+                                    value={autoLight.threshold}
+                                    onChange={(e) => setAutoLight(prev => ({ ...prev, threshold: Number(e.target.value) }))}
+                                    onMouseUp={() => handleAutoSettingsUpdate('light', true, autoLight.threshold)}
+                                    onTouchEnd={() => handleAutoSettingsUpdate('light', true, autoLight.threshold)}
+                                    className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-yellow-500"
+                                  />
+                                </motion.div>
+                              )}
+                            </div>
+                          </div>
+                        ) : isWaterCard ? (
+                          /* 흙의 상태 카드: 수동 물주기 + 자동 모드 패널 */
+                          <div className="space-y-4">
+                            <Button
+                              onClick={handleWaterToggle}
+                              disabled={autoWater.enabled}
+                              className={`w-full font-bold h-11 rounded-xl transition-all ${isWatering
+                                ? 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+                                : 'bg-sky-500 hover:bg-sky-600 text-white shadow-md'
+                                } ${autoWater.enabled ? 'opacity-55 cursor-not-allowed' : ''}`}
+                            >
+                              {isWatering ? (
+                                <>
+                                  <div className="size-4 border-2 border-slate-400 border-t-slate-600 rounded-full animate-spin mr-2" />
+                                  물주기 중단
+                                </>
+                              ) : (
+                                <>
+                                  <Droplets className="size-4 mr-2" />
+                                  물주기 시작
+                                </>
+                              )}
+                            </Button>
+
+                            <div className="bg-white/40 p-4 rounded-2xl border border-white/50 space-y-3 shadow-sm">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <span className="text-xs font-black text-slate-800 block">스마트 자동 물주기</span>
+                                  <span className="text-[9px] text-slate-500 font-bold block">토양이 건조해지면 자동으로 줍니다</span>
+                                </div>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={autoWater.enabled}
+                                    onChange={() => handleToggleClick('water', autoWater.enabled)}
+                                    className="sr-only peer"
+                                  />
+                                  <div className="w-9 h-5 bg-slate-300/60 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sky-500"></div>
+                                </label>
+                              </div>
+
+                              {autoWater.enabled && (
+                                <motion.div
+                                  initial={{ opacity: 0, height: 0 }}
+                                  animate={{ opacity: 1, height: 'auto' }}
+                                  className="space-y-2 pt-2 border-t border-black/5"
+                                >
+                                  <div className="flex justify-between text-[10px] font-bold text-slate-700">
+                                    <span>임계 습도 설정</span>
+                                    <span className="text-sky-600">{autoWater.threshold}% 이하</span>
+                                  </div>
+                                  <input
+                                    type="range"
+                                    min="10"
+                                    max="90"
+                                    step="5"
+                                    value={autoWater.threshold}
+                                    onChange={(e) => setAutoWater(prev => ({ ...prev, threshold: Number(e.target.value) }))}
+                                    onMouseUp={() => handleAutoSettingsUpdate('water', true, autoWater.threshold)}
+                                    onTouchEnd={() => handleAutoSettingsUpdate('water', true, autoWater.threshold)}
+                                    className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                                  />
+                                </motion.div>
+                              )}
+                            </div>
+                          </div>
                         ) : (
                           /* 2. 그 외 카드: Care Tip 가이드 표시 */
                           <div className="bg-white/50 p-3.5 rounded-xl border border-white/40 shadow-inner">
@@ -771,6 +1081,67 @@ export function StatusView({ setError }: StatusViewProps) {
           마지막 업데이트: {new Date().toLocaleTimeString('ko-KR')}
         </div>
       </div>
+
+
+      {/* 스마트 자동화 임계값 설정 모달 */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="rounded-[2.5rem] p-8 max-w-sm bg-white/95 backdrop-blur-xl border-none shadow-2xl">
+          <DialogHeader className="space-y-3">
+            <DialogTitle className="text-xl font-black text-emerald-950">
+              {modalType === 'water' ? '💧 스마트 자동 물주기 설정' : '☀️ 스마트 자동 햇빛 설정'}
+            </DialogTitle>
+            <DialogDescription className="text-xs font-medium text-slate-500 leading-relaxed">
+              {modalType === 'water' 
+                ? '화분의 토양 습도가 설정한 값 이하로 내려가면 자동으로 모터를 제어하여 물을 공급합니다.' 
+                : '식물 주변의 조도가 설정한 값 이하로 떨어지면 자동으로 인공 햇빛(LED)을 켭니다.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-6 space-y-4">
+            <div className="flex justify-between items-baseline">
+              <span className="text-sm font-bold text-slate-800">목표 {modalType === 'water' ? '토양 습도' : '조도 임계값'}</span>
+              <span className={`text-2xl font-black ${modalType === 'water' ? 'text-sky-600' : 'text-yellow-600'}`}>
+                {tempThreshold}{modalType === 'water' ? '%' : ' lux'} 이하
+              </span>
+            </div>
+
+            <input
+              type="range"
+              min={modalType === 'water' ? 10 : 2500}
+              max={modalType === 'water' ? 90 : 6000}
+              step={modalType === 'water' ? 5 : 50}
+              value={tempThreshold}
+              onChange={(e) => setTempThreshold(Number(e.target.value))}
+              className={`w-full h-2 rounded-lg appearance-none cursor-pointer ${
+                modalType === 'water' ? 'accent-sky-500' : 'accent-yellow-500'
+              }`}
+            />
+          </div>
+
+          <div className="flex gap-3">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsModalOpen(false)}
+              className="flex-1 font-bold h-12 rounded-2xl border-slate-200"
+            >
+              취소
+            </Button>
+            <Button 
+              onClick={() => {
+                if (modalType) {
+                  handleAutoSettingsUpdate(modalType, true, tempThreshold);
+                  setIsModalOpen(false);
+                }
+              }}
+              className={`flex-1 font-bold h-12 rounded-2xl text-white ${
+                modalType === 'water' ? 'bg-sky-500 hover:bg-sky-600' : 'bg-yellow-500 hover:bg-yellow-600'
+              }`}
+            >
+              설정 적용
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
 
       {/* 실시간 카메라 모달 */}

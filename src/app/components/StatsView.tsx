@@ -12,17 +12,17 @@ import api from '../api/axios';
 
 // 상단 SENSOR_TYPES 배열에 unit 추가
 const SENSOR_TYPES = [
-    { id: 'moisture', label: '습도', icon: Droplets, color: '#10b981', unit: '%' },
-    { id: 'light', label: '조도', icon: Sun, color: '#f59e0b', unit: 'lux' },
     { id: 'soil', label: '흙의 상태', icon: Sprout, color: '#059669', unit: '%' },
-    { id: 'bug', label: '벌레', icon: Bug, color: '#64748b', unit: '마리' },
+    { id: 'light', label: '조도', icon: Sun, color: '#f59e0b', unit: 'lux' },
     { id: 'temperature', label: '온도', icon: Thermometer, color: '#ef4444', unit: '°C' },
-    { id: 'disease', label: '질병', icon: AlertTriangle, color: '#a855f7', unit: '' },
+    { id: 'moisture', label: '습도', icon: Droplets, color: '#10b981', unit: '%' },
+    { id: 'bug', label: '벌레', icon: Bug, color: '#64748b', unit: '회' },
+    { id: 'disease', label: '질병', icon: AlertTriangle, color: '#a855f7', unit: '회' },
 ];
 
 interface HistoryData {
     timestamp: string;
-    value: number;
+    value: string;
     type: string;
 }
 
@@ -35,7 +35,7 @@ export function StatsView({ setError }: StatsViewProps) {
     const plantId = searchParams.get('plantId');
 
     const [historyData, setHistoryData] = useState<HistoryData[]>([]);
-    const [selectedType, setSelectedType] = useState('moisture');
+    const [selectedType, setSelectedType] = useState('soil');
     const [isLoading, setIsLoading] = useState(false);
 
     const [dateRange, setDateRange] = useState({
@@ -73,10 +73,91 @@ export function StatsView({ setError }: StatsViewProps) {
         fetchHistory();
     }, [selectedType, dateRange, plantId]);
 
-    // 평균값 계산
-    const averageValue = historyData.length > 0
-        ? (historyData.reduce((acc, c) => acc + c.value, 0) / historyData.length).toFixed(1)
-        : '-';
+    const isCategorical = ['soil', 'bug', 'disease'].includes(selectedType);
+
+    // 1. 차트용 데이터 가공 (텍스트 데이터를 수치형 0, 1로 매핑)
+    const processedChartData = historyData.map(item => {
+        let displayValue = item.value;
+        let numericValue = parseFloat(item.value);
+
+        if (isNaN(numericValue)) {
+            if (selectedType === 'soil') {
+                const isGood = ['적정', 'WET', 'MOIST', 'good', 'normal', '정상'].includes(item.value);
+                numericValue = isGood ? 1 : 0;
+                displayValue = isGood ? '적정' : '건조함';
+            } else if (selectedType === 'bug') {
+                const hasBug = (item.value === 'true' || item.value === '발견됨');
+                numericValue = hasBug ? 1 : 0;
+                displayValue = hasBug ? '발견됨' : '없음';
+            } else if (selectedType === 'disease') {
+                const isNormal = (item.value === '없음' || item.value === '정상' || item.value === 'none');
+                numericValue = isNormal ? 0 : 1;
+                displayValue = isNormal ? '정상' : item.value;
+            } else {
+                numericValue = 0;
+            }
+        } else {
+            // numeric types could be bug=1.0 or bug=0.0
+            if (selectedType === 'soil') {
+                displayValue = numericValue === 1 ? '적정' : '건조함';
+            } else if (selectedType === 'bug') {
+                displayValue = numericValue === 1 ? '발견됨' : '없음';
+            } else if (selectedType === 'disease') {
+                displayValue = numericValue === 0 ? '정상' : '주의/진단됨';
+            }
+        }
+
+        return {
+            ...item,
+            displayValue,
+            value: numericValue
+        };
+    });
+
+    // 2. 카드에 보여줄 라벨 및 수치 결정
+    let displayStatLabel = 'Selected Average';
+    let displayStatDesc = (
+        <span>선택한 기간 동안의 평균 <span className="text-white font-bold">{activeSensor.label}</span> 수치입니다.</span>
+    );
+    let displayStatValue = '-';
+    let displayUnit = activeSensor.unit;
+
+    if (selectedType === 'bug' || selectedType === 'disease') {
+        displayStatLabel = 'Detected Count';
+        displayStatDesc = (
+            <span>선택한 기간 동안 <span className="text-white font-bold">{activeSensor.label}</span>가 감지된 총 횟수입니다.</span>
+        );
+        displayStatValue = String(processedChartData.filter(item => item.value === 1).length);
+        displayUnit = '회';
+    } else if (selectedType === 'soil') {
+        displayStatLabel = 'Latest Status';
+        displayStatDesc = (
+            <span>최근 감지된 <span className="text-white font-bold">{activeSensor.label}</span> 상태입니다.</span>
+        );
+        if (historyData.length > 0) {
+            displayStatValue = historyData[historyData.length - 1].value;
+        }
+        displayUnit = '';
+    } else {
+        const numericValues = historyData
+            .map(c => parseFloat(c.value))
+            .filter(val => !isNaN(val));
+
+        displayStatValue = numericValues.length > 0
+            ? (numericValues.reduce((acc, val) => acc + val, 0) / numericValues.length).toFixed(1)
+            : '-';
+    }
+
+    const yAxisTickFormatter = (val: number) => {
+        if (selectedType === 'soil') {
+            return val === 0 ? '건조함' : '적정';
+        } else if (selectedType === 'bug') {
+            return val === 0 ? '없음' : '발견됨';
+        } else if (selectedType === 'disease') {
+            return val === 0 ? '정상' : '주의';
+        }
+        return String(val);
+    };
 
     return (
         <div className="min-h-screen w-full bg-gradient-to-br from-green-50 via-emerald-50 to-teal-100 p-6 pb-24 relative overflow-hidden">
@@ -155,15 +236,15 @@ export function StatsView({ setError }: StatsViewProps) {
                                     <TrendingUp size={80} />
                                 </div>
                                 <CardHeader className="pb-2 relative z-10">
-                                    <CardDescription className="text-emerald-400 font-black uppercase text-[10px] tracking-widest">Selected Average</CardDescription>
+                                    <CardDescription className="text-emerald-400 font-black uppercase text-[10px] tracking-widest">{displayStatLabel}</CardDescription>
                                     <CardTitle className="text-5xl font-black tracking-tighter flex items-baseline gap-1">
-                                        {averageValue}
-                                        <span className="text-lg font-bold text-emerald-400/60">{activeSensor.unit}</span>
+                                        {displayStatValue}
+                                        {displayUnit && <span className="text-lg font-bold text-emerald-400/60">{displayUnit}</span>}
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="relative z-10">
                                     <p className="text-xs text-emerald-200/80 leading-relaxed font-medium">
-                                        선택한 기간 동안의 평균 <span className="text-white font-bold">{activeSensor.label}</span> 수치입니다.
+                                        {displayStatDesc}
                                     </p>
                                 </CardContent>
                             </Card>
@@ -236,7 +317,7 @@ export function StatsView({ setError }: StatsViewProps) {
                             </CardHeader>
                             <CardContent className="p-8 h-[450px]">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={historyData}>
+                                    <AreaChart data={processedChartData}>
                                         <defs>
                                             <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
                                                 <stop offset="5%" stopColor={activeSensor.color} stopOpacity={0.4} />
@@ -261,14 +342,22 @@ export function StatsView({ setError }: StatsViewProps) {
                                             tickMargin={15}
                                             axisLine={false}
                                             tickLine={false}
+                                            ticks={isCategorical ? [0, 1] : undefined}
+                                            tickFormatter={isCategorical ? yAxisTickFormatter : undefined}
+                                            domain={isCategorical ? [0, 1] : undefined}
                                         />
                                         <Tooltip
                                             content={({ active, payload, label }) => {
                                                 if (active && payload && payload.length) {
+                                                    const dataItem = payload[0].payload;
+                                                    const showUnit = !['soil', 'bug', 'disease'].includes(selectedType);
                                                     return (
                                                         <div className="bg-emerald-900 text-white p-4 rounded-2xl shadow-2xl border-none backdrop-blur-lg">
                                                             <p className="text-[10px] font-black text-emerald-400 uppercase mb-1">{new Date(label).toLocaleString()}</p>
-                                                            <p className="text-lg font-black">{payload[0].value}<span className="text-xs ml-0.5 opacity-70">{activeSensor.unit}</span></p>
+                                                            <p className="text-lg font-black">
+                                                                {dataItem.displayValue}
+                                                                {showUnit && activeSensor.unit && <span className="text-xs ml-0.5 opacity-70">{activeSensor.unit}</span>}
+                                                            </p>
                                                         </div>
                                                     );
                                                 }
@@ -276,7 +365,7 @@ export function StatsView({ setError }: StatsViewProps) {
                                             }}
                                         />
                                         <Area
-                                            type="monotone"
+                                            type={isCategorical ? "step" : "monotone"}
                                             dataKey="value"
                                             stroke={activeSensor.color}
                                             strokeWidth={4}

@@ -3,12 +3,13 @@ importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js'
 importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js');
 
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyDtFTrz5EKv9qsd6b_jyUY2sfGypfVzy1Q",
+    authDomain: "greenmate-7b029.firebaseapp.com",
+    projectId: "greenmate-7b029",
+    storageBucket: "greenmate-7b029.firebasestorage.app",
+    messagingSenderId: "984562560408",
+    appId: "1:984562560408:web:8d372bd1eb11fa18cd0fed",
+    measurementId: "G-SM9XSE56LY"
 };
 
 firebase.initializeApp(firebaseConfig);

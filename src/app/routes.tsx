@@ -6,6 +6,8 @@ import { PlantSelectionPage } from './pages/PlantSelectionPage';
 import { PlantStatusPage } from './pages/PlantStatusPage';
 import { PlantList } from './components/PlantList';
 import { ForgotPassword } from './pages/ForgotPassword';
+import { NotificationHistoryPage } from './pages/NotificationHistoryPage';
+import { PushTestPage } from './pages/PushTestPage';
 
 export const router = createBrowserRouter([
   {
@@ -38,6 +40,14 @@ export const router = createBrowserRouter([
   {
     path: '/plant-status',
     element: <PlantStatusPage />,
+  },
+  {
+    path: '/notifications',
+    element: <NotificationHistoryPage />,
+  },
+  {
+    path: '/push-test',
+    element: <PushTestPage />,
   },
   {
     path: '*',

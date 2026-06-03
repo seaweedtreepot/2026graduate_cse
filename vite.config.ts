@@ -11,7 +11,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       devOptions: {
-        enabled: true
+        enabled: true,
+        type: 'module',
       },
       // 추가 1: iOS 홈화면 추가용 manifest
       manifest: {
@@ -31,6 +32,16 @@ export default defineConfig({
       filename: 'sw.ts'
     })
   ],
+  server: {
+    allowedHosts: true,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(new URL('.', import.meta.url).pathname, './src'),

@@ -1,5 +1,6 @@
 import { createContext, useState, useEffect } from 'react';
 import api from '../api/axios';
+import { getAccessToken } from '../utils/auth';
 
 export const UserContext = createContext<any>({ userInfo: null });
 
@@ -21,7 +22,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             }
         };
 
-        if (localStorage.getItem('accessToken')) {
+        if (getAccessToken()) {
             fetchUserProfile();
         }
     }, []);
