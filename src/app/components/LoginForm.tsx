@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router'; // 또는 'react-router'
 import { publicApi } from '../api/axios';
 import { Button } from './ui/button';
@@ -6,6 +6,8 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
 import { Eye, EyeOff, Lock, Mail, Sprout, Sparkles, Leaf } from 'lucide-react';
+import { Checkbox } from './ui/checkbox';
+import { setTokens } from '../utils/auth';
 
 export function LoginForm() {
   const navigate = useNavigate();
@@ -14,6 +16,16 @@ export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
+  const [rememberEmail, setRememberEmail] = useState(false);
+
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('rememberedEmail');
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setRememberEmail(true);
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,8 +39,14 @@ export function LoginForm() {
       });
 
       const { accessToken, refreshToken } = response.data;
-      localStorage.setItem('accessToken', accessToken);
-      localStorage.setItem('refreshToken', refreshToken);
+      
+      if (rememberEmail) {
+        localStorage.setItem('rememberedEmail', email.trim());
+      } else {
+        localStorage.removeItem('rememberedEmail');
+      }
+
+      setTokens(accessToken, refreshToken, rememberMe);
 
       // 로그인 성공 후 식물 목록 화면으로 이동
       navigate('/plant-list');
@@ -127,6 +145,39 @@ export function LoginForm() {
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
+              </div>
+            </div>
+
+            {/* 로그인 유지 및 정보 기억 설정 */}
+            <div className="flex items-center justify-between px-1 py-1">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="rememberMe"
+                  checked={rememberMe}
+                  onCheckedChange={(checked) => setRememberMe(checked === true)}
+                  className="border-emerald-300 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 focus-visible:ring-emerald-500"
+                />
+                <Label
+                  htmlFor="rememberMe"
+                  className="text-xs font-bold text-emerald-800 cursor-pointer select-none"
+                >
+                  로그인 유지
+                </Label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="rememberEmail"
+                  checked={rememberEmail}
+                  onCheckedChange={(checked) => setRememberEmail(checked === true)}
+                  className="border-emerald-300 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 focus-visible:ring-emerald-500"
+                />
+                <Label
+                  htmlFor="rememberEmail"
+                  className="text-xs font-bold text-emerald-800 cursor-pointer select-none"
+                >
+                  이메일 기억하기
+                </Label>
               </div>
             </div>
 

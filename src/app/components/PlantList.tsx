@@ -3,7 +3,7 @@ import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
-import { Sprout, Plus, Activity, Leaf, Sparkles, AlertCircle, WifiOff, RefreshCw, Skull, Archive, X, Info, Bell, Trash2 } from 'lucide-react';
+import { Sprout, Plus, Activity, Leaf, Sparkles, AlertCircle, WifiOff, RefreshCw, Skull, Archive, X, Info, Bell, Trash2, Droplets, Sun, Thermometer, Bug, AlertTriangle, HelpCircle, CloudRain } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../api/axios';
 import { UserContext } from '../context/UserContext';
@@ -24,17 +24,96 @@ interface Plant {
 const DUMMY_PLANTS: Plant[] = [
     { plantId: 101, name: "실험체 바질1", species: "BASIL", status: "good", level: 1 },
     { plantId: 102, name: "실험체 바질2", species: "BASIL", status: "warning", level: 1 },
-    { plantId: 103, name: "실험체 바질 3", species: "BASIL", status: "dead", level: 1 },
+    { plantId: 103, name: "수분 부족 바질", species: "BASIL", status: "dead", level: 1 },
     { plantId: 104, name: "실험체 바질4", species: "BASIL", status: "good", level: 1 },
+    { plantId: 105, name: "광량 부족 몬스테라", species: "MONSTERA", status: "dead", level: 2 },
+    { plantId: 106, name: "냉해 피해 로즈마리", species: "ROSEMARY", status: "dead", level: 3 },
+    { plantId: 107, name: "건조 탈수 민트", species: "MINT", status: "dead", level: 4 },
+    { plantId: 108, name: "응애 습격 상추", species: "LETTUCE", status: "dead", level: 5 },
+    { plantId: 109, name: "무름병 감염 라벤더", species: "LAVENDER", status: "dead", level: 5 },
+    { plantId: 110, name: "원인 불명 선인장", species: "CACTUS", status: "dead", level: 5 },
+    { plantId: 111, name: "복합 피해 바질 (수분+광량)", species: "BASIL", status: "dead", level: 5 },
 ];
 
 interface DeathReport {
     plantId: number;
     deathDate: string;
-    reason: string;
+    factors?: string[];
+}
+
+const FACTOR_CARDS: Record<string, {
+    title: string;
     description: string;
     tips: string;
-}
+    color: string;
+    bg: string;
+    border: string;
+    icon: React.ReactNode;
+}> = {
+    moisture: {
+        title: "토양 수분 불균형",
+        description: "식물의 뿌리가 과도한 물 공급으로 숨을 쉬지 못해 썩었거나, 혹은 물이 오랫동안 공급되지 않아 말라 죽었을 가능성이 매우 높습니다.",
+        tips: "손가락 한 마디 깊이의 겉흙이 바짝 마른 것을 확인한 후 한 번에 흠뻑 물을 주는 저면관수나 주기를 일정하게 맞춘 물주기를 실행해 보세요. 배수가 잘 되는 흙(펄라이트 혼합)을 사용하는 것이 필수적입니다.",
+        color: "text-sky-700",
+        bg: "bg-sky-50/80",
+        border: "border-sky-100",
+        icon: <Droplets className="size-5 text-sky-500" />
+    },
+    light: {
+        title: "광량 공급 부적절",
+        description: "빛이 너무 부족해 광합성량이 극도로 저조하여 식물이 시들었거나, 혹은 강한 직사광선 아래 방치되어 잎이 타들어 가며 고사했을 수 있습니다.",
+        tips: "식물의 종류(양지, 반양지, 음지 식물)에 적합한 장소를 찾아 배치해 주세요. 실내 광량이 부족하다면 자동 타이머 기능이 포함된 식물 생장용 스마트 LED 식물등을 가동하는 것을 추천합니다.",
+        color: "text-amber-700",
+        bg: "bg-amber-50/80",
+        border: "border-amber-100",
+        icon: <Sun className="size-5 text-amber-500" />
+    },
+    temperature: {
+        title: "온도 관리 실패",
+        description: "겨울철 영하에 가까운 냉해를 입었거나, 여름철 베란다의 지나친 고온 장해(30°C 이상 방치)로 인해 세포벽이 파괴되어 죽었을 가능성이 큽니다.",
+        tips: "식물의 적정 생육 온도(보통 15°C~25°C)를 유지해 주세요. 한여름 낮이나 한겨울 밤에는 베란다에서 거실 안쪽으로 식물을 들여놓고 관리해야 안전합니다.",
+        color: "text-rose-700",
+        bg: "bg-rose-50/80",
+        border: "border-rose-100",
+        icon: <Thermometer className="size-5 text-rose-500" />
+    },
+    humidity: {
+        title: "공기 습도 부적절",
+        description: "건조한 실내 환경으로 인해 수분 증산 작용이 비정상적으로 빨라져 말랐거나, 통풍이 없는 지나치게 습한 환경으로 인해 병해균이 번식했을 수 있습니다.",
+        tips: "공기가 너무 건조할 때는 잎 주변에 자주 분무해 주거나 가습기를 가동하고, 습도가 너무 높을 때는 서큘레이터나 환기를 통해 공기 흐름을 만들어 주어야 합니다.",
+        color: "text-blue-700",
+        bg: "bg-blue-50/80",
+        border: "border-blue-100",
+        icon: <CloudRain className="size-5 text-blue-500" />
+    },
+    bug: {
+        title: "해충 피해 방치",
+        description: "응애, 진딧물, 개각충 또는 뿌리파리 등 눈에 잘 보이지 않는 해충들이 급격히 번식하여 줄기와 뿌리의 즙액을 흡즙해 영양 결핍으로 사멸했을 수 있습니다.",
+        tips: "평소 잎의 앞면뿐만 아니라 뒷면과 흙 표면을 자주 관찰하고 통풍이 잘되도록 해야 합니다. 해충이 보인다면 즉시 친환경 살충제를 3일 간격으로 살포하여 박멸해야 합니다.",
+        color: "text-lime-700",
+        bg: "bg-lime-50/80",
+        border: "border-lime-100",
+        icon: <Bug className="size-5 text-lime-500" />
+    },
+    disease: {
+        title: "식물 질병 발생",
+        description: "잎마름병, 흰가루병 등의 질병으로 인해 잎이 마르고 세포가 괴사했을 가능성이 있습니다. 병든 부위를 빠르게 잘라내고 전용 살균제를 처방해야 대처할 수 있습니다.",
+        tips: "병든 잎이나 줄기가 보이면 즉시 소독된 가위로 잘라내 격리하고, 통풍이 잘 통하는 공간으로 옮긴 후 전용 살균제를 가동해 주는 것이 치료법입니다.",
+        color: "text-orange-700",
+        bg: "bg-orange-50/80",
+        border: "border-orange-100",
+        icon: <AlertTriangle className="size-5 text-orange-500" />
+    },
+    unknown: {
+        title: "복합적 환경 요인",
+        description: "특정 단일 센서 임계치로는 검출되지 않았으나, 급격한 분갈이 몸살, 영양제 과다 공급(비료 과다), 혹은 환기 부족 등 여러 요인이 누적되어 고사한 것으로 분석됩니다.",
+        tips: "새로운 화분으로 분갈이한 후에는 1~2주간 그늘에서 적응 기간을 가지며 안정을 주어야 합니다. 비료는 성장이 활발한 봄/가을에만 적정량 희석하여 공급하고 항상 환기를 확보해 주세요.",
+        color: "text-slate-700",
+        bg: "bg-slate-50/80",
+        border: "border-slate-100",
+        icon: <HelpCircle className="size-5 text-slate-500" />
+    }
+};
 
 export function PlantList() {
     const navigate = useNavigate();
@@ -118,18 +197,31 @@ export function PlantList() {
     const fetchDeathReport = async (plantId: number) => {
         setIsReportLoading(true);
         try {
-            setTimeout(() => {
-                setSelectedReport({
-                    plantId,
-                    deathDate: "2026.05.10",
-                    reason: "과습 (Overwatering)",
-                    description: "뿌리가 충분히 숨을 쉴 시간이 부족했어요. 토양 센서가 90% 이상의 습도를 3일간 유지한 것이 원인으로 분석됩니다.",
-                    tips: "다음 바질을 키울 때는 겉흙이 충분히 말랐을 때 물을 주는 것이 좋아요. 배수층을 더 높게 쌓아보는 건 어떨까요?"
-                });
-                setIsReportLoading(false);
-            }, 500);
+            const res = await api.get(`/plants/${plantId}/reports/death`);
+            const reportData = res.data;
+            if (reportData.deathDate) {
+                reportData.deathDate = reportData.deathDate.split('T')[0].replace(/-/g, '.');
+            }
+            setSelectedReport(reportData);
         } catch (err) {
-            console.error("리포트 호출 실패", err);
+            console.error("리포트 호출 실패, 데모용 폴백 실행:", err);
+            
+            let factors: string[] = ["unknown"];
+            if (plantId === 103) factors = ["moisture"];
+            else if (plantId === 105) factors = ["light"];
+            else if (plantId === 106) factors = ["temperature"];
+            else if (plantId === 107) factors = ["humidity"];
+            else if (plantId === 108) factors = ["bug"];
+            else if (plantId === 109) factors = ["disease"];
+            else if (plantId === 110) factors = ["unknown"];
+            else if (plantId === 111) factors = ["moisture", "light"];
+
+            setSelectedReport({
+                plantId,
+                deathDate: "2026.05.10",
+                factors
+            });
+        } finally {
             setIsReportLoading(false);
         }
     };
@@ -438,14 +530,46 @@ export function PlantList() {
                                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{selectedReport.deathDate} 떠나감</p>
                                 </div>
                                 <div className="space-y-4">
-                                    <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
-                                        <div className="flex items-center gap-2 mb-2"><Info className="size-4 text-slate-500" /><span className="text-xs font-black text-slate-500">사망 원인</span></div>
-                                        <p className="text-lg font-bold text-slate-800">{selectedReport.reason}</p>
-                                        <p className="text-sm text-slate-600 mt-2 leading-relaxed">{selectedReport.description}</p>
-                                    </div>
-                                    <div className="bg-emerald-50 p-5 rounded-3xl border border-emerald-100">
-                                        <div className="flex items-center gap-2 mb-2"><Sparkles className="size-4 text-emerald-500" /><span className="text-xs font-black text-emerald-500">정원사의 팁</span></div>
-                                        <p className="text-sm text-emerald-800 font-medium leading-relaxed">{selectedReport.tips}</p>
+                                    {/* 복합 사망 요인 피드백 카드 목록 */}
+                                    <div className="space-y-3">
+                                        <div className="px-1 text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                                            사망 주요인 분석 & 피드백
+                                        </div>
+                                        {(selectedReport.factors && selectedReport.factors.length > 0
+                                            ? selectedReport.factors
+                                            : ["unknown"]
+                                        ).map((factor) => {
+                                            const card = FACTOR_CARDS[factor] || FACTOR_CARDS.unknown;
+                                            return (
+                                                <motion.div
+                                                    key={factor}
+                                                    initial={{ opacity: 0, y: 10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    className={`p-5 rounded-3xl border ${card.bg} ${card.border} space-y-3.5 shadow-sm`}
+                                                >
+                                                    <div className="flex items-center gap-2 border-b border-black/5 pb-2">
+                                                        {card.icon}
+                                                        <span className={`text-xs font-black ${card.color}`}>
+                                                            {card.title}
+                                                        </span>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <div>
+                                                            <span className="text-[10px] font-black text-slate-400 block mb-0.5">사망 원인 분석</span>
+                                                            <p className="text-xs text-slate-700 leading-relaxed font-semibold">
+                                                                {card.description}
+                                                            </p>
+                                                        </div>
+                                                        <div className="pt-2 border-t border-black/5">
+                                                            <span className="text-[10px] font-black text-emerald-600/70 block mb-0.5">정원사의 피드백 팁</span>
+                                                            <p className="text-xs text-emerald-800 leading-relaxed font-semibold">
+                                                                {card.tips}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </motion.div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                                 <Button onClick={() => setSelectedReport(null)} className="w-full py-6 rounded-2xl bg-slate-800 text-white font-black text-lg">기억할게요</Button>

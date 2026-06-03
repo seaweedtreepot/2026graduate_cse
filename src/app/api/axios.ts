@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getAccessToken, getRefreshToken, updateTokens, clearTokens } from '../utils/auth';
 
 const BASE_URL = typeof window !== 'undefined' && window.location.protocol === 'https:'
     ? '/api/v1'
@@ -23,7 +24,7 @@ export const api = axios.create({
 // 요청 인터셉터: 인증용 인스턴스에만 토큰을 주입합니다.
 api.interceptors.request.use(
     (config) => {
-        const accessToken = localStorage.getItem('accessToken');
+        const accessToken = getAccessToken();
         if (accessToken && config.headers) {
             config.headers['Authorization'] = `Bearer ${accessToken}`;
         }
@@ -75,7 +76,7 @@ api.interceptors.response.use(
             isRefreshing = true;
 
             try {
-                const refreshToken = localStorage.getItem('refreshToken');
+                const refreshToken = getRefreshToken();
                 if (!refreshToken) throw new Error('Refresh token이 없습니다.');
 
                 // 토큰 재발급은 publicApi를 사용하여 인터셉터 혼선을 방지합니다.
@@ -85,10 +86,7 @@ api.interceptors.response.use(
 
                 const { accessToken: newAccessToken, refreshToken: newRefreshToken } = response.data;
 
-                localStorage.setItem('accessToken', newAccessToken);
-                if (newRefreshToken) {
-                    localStorage.setItem('refreshToken', newRefreshToken);
-                }
+                updateTokens(newAccessToken, newRefreshToken);
 
                 processQueue(null, newAccessToken);
                 isRefreshing = false;
@@ -102,13 +100,12 @@ api.interceptors.response.use(
                 console.error('세션 만료. 다시 로그인해야 합니다.', refreshError);
 
                 // 로그인 화면이 아니고, 스토리지에 토큰이 하나라도 남아있는 경우에만(최초 1회) 로그아웃 처리 실행
-                const hasAccessToken = !!localStorage.getItem('accessToken');
-                const hasRefreshToken = !!localStorage.getItem('refreshToken');
+                const hasAccessToken = !!getAccessToken();
+                const hasRefreshToken = !!getRefreshToken();
                 const isNotLoginPage = window.location.pathname !== '/';
 
                 if (isNotLoginPage && (hasAccessToken || hasRefreshToken)) {
-                    localStorage.removeItem('accessToken');
-                    localStorage.removeItem('refreshToken');
+                    clearTokens();
                     alert('로그인 세션이 만료되었습니다. 다시 로그인해 주세요.');
                     window.location.href = '/';
                 } else if (isNotLoginPage) {
