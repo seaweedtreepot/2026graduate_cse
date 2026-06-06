@@ -36,7 +36,7 @@ export default defineConfig({
     allowedHosts: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: 'http://54.211.120.247:8080',
         changeOrigin: true,
         secure: false,
       },

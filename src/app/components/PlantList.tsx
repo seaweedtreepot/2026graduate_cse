@@ -289,7 +289,6 @@ export function PlantList() {
 
     const livePlants = plants.filter(p => p.status !== 'dead');
     const deadPlants = plants.filter(p => p.status === 'dead');
-    const healthyPlantsCount = plants.filter(p => p.status === 'good').length;
     const displayPlants = viewMode === 'live' ? livePlants : deadPlants;
 
     const showNotifBanner =
@@ -363,21 +362,7 @@ export function PlantList() {
 
                 {/* 헤더 */}
                 <header className="pt-4 flex flex-col items-center text-center relative">
-                    {/* FCM 테스트 버튼 */}
-                    <button
-                        onClick={async () => {
-                            try {
-                                const res = await api.get('/users/me/fcm-test');
-                                console.log("백엔드 전송 완료: " + res.data.status);
-                            } catch (e: any) {
-                                console.error("테스트 전송 실패: " + (e.response?.data?.message || e.message));
-                            }
-                        }}
-                        className="absolute left-0 top-4 p-3 bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border border-white/60 hover:bg-white/90 transition-all active:scale-95 text-xs font-black text-emerald-700"
-                        title="FCM 테스트 알림 보내기"
-                    >
-                        테스트 알림
-                    </button>
+
 
                     {/* 알림 이력 버튼 */}
                     <button
@@ -409,7 +394,7 @@ export function PlantList() {
                 {/* 대시보드 탭 */}
                 <div className="w-full flex justify-center pt-2 px-2">
                     <motion.div className="w-full max-w-md bg-white/40 backdrop-blur-xl rounded-[2.5rem] p-4 shadow-xl border border-white/80">
-                        <div className="grid grid-cols-3 items-center w-full">
+                        <div className="grid grid-cols-2 items-center w-full">
                             <button
                                 onClick={() => setViewMode('live')}
                                 className={`flex flex-col items-center gap-1 p-2 rounded-2xl transition-all ${viewMode === 'live' ? 'bg-white/60 shadow-inner' : 'opacity-50'}`}
@@ -417,10 +402,6 @@ export function PlantList() {
                                 <Leaf className={`size-5 ${viewMode === 'live' ? 'text-emerald-500' : 'text-slate-400'}`} />
                                 <span className="text-[10px] font-black text-emerald-950">정원 {livePlants.length}</span>
                             </button>
-                            <div className="flex flex-col items-center gap-1 border-x border-emerald-100/50">
-                                <Sparkles className="size-5 text-amber-400" />
-                                <span className="text-[10px] font-black text-emerald-950">건강 {healthyPlantsCount}</span>
-                            </div>
                             <button
                                 onClick={() => setViewMode('dead')}
                                 className={`flex flex-col items-center gap-1 p-2 rounded-2xl transition-all ${viewMode === 'dead' ? 'bg-slate-200 shadow-inner' : 'opacity-50'}`}
@@ -462,7 +443,7 @@ export function PlantList() {
                                         if (isDead) {
                                             fetchDeathReport(plant.plantId);
                                         } else {
-                                            navigate(`/plant-status?plantId=${plant.plantId}&plant=${plant.name}&level=${plant.level}`);
+                                            navigate(`/plant-status?plantId=${plant.plantId}&plant=${plant.name}&level=${plant.level}&status=${plant.status}`);
                                         }
                                     }}
                                     className={isDead ? "cursor-help" : "cursor-pointer"}
