@@ -207,21 +207,6 @@ export function LoginForm() {
             아직 정원사가 아니신가요?{' '}
             <button type="button" className="font-black text-emerald-600 underline underline-offset-4" onClick={() => navigate('/register')}>회원가입</button>
           </div>
-
-          <div className="w-full flex items-center gap-2">
-            <div className="h-[1px] flex-1 bg-emerald-100" />
-            <span className="text-[10px] uppercase tracking-widest text-emerald-300 font-semibold">Dev Mode</span>
-            <div className="h-[1px] flex-1 bg-emerald-100" />
-          </div>
-
-          {/* ✅ 기능 추가: Dev Mode 클릭 시 이동 */}
-          <button
-            type="button"
-            className="flex items-center gap-2 text-xs text-emerald-400 hover:text-emerald-600 mx-auto transition-colors font-bold"
-            onClick={() => navigate('/plant-list')}
-          >
-            <Leaf size={14} /> 기기 등록 프리뷰 (Dev)
-          </button>
         </CardFooter>
       </Card>
     </div>

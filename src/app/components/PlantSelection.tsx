@@ -7,9 +7,11 @@ import { Leaf, Calendar, Sparkles, ArrowRight, ArrowLeft, Tag, Droplets, Sun, Ti
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../api/axios';
 
-// 1. 바질만 남긴 심플 데이터
+// 시연용 식물 데이터 목록
 const plants = [
-  { id: 'basil', name: 'Basil', nameKo: '바질', emoji: '🌿' },
+  { id: 'basil', name: 'Basil', nameKo: '바질', emoji: '🌿', difficulty: '쉬움' },
+  { id: 'tomato', name: 'Cherry Tomato', nameKo: '방울토마토', emoji: '🍅', difficulty: '쉬움' },
+  { id: 'lettuce', name: 'Lettuce', nameKo: '상추', emoji: '🥬', difficulty: '쉬움' },
 ];
 
 export function PlantSelection() {
@@ -20,17 +22,18 @@ export function PlantSelection() {
   const [plantedDate, setPlantedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // 식물 선택 시 (바질 클릭 시)
+  // 식물 선택 시
   const selectPlant = (id: string) => {
     setSelectedPlant(id);
-    setNickname('바질이'); // 기본 이름 미리 셋팅
+    const plant = plants.find((p) => p.id === id);
+    setNickname(plant ? `${plant.nameKo}이` : '초록이'); // 기본 이름 미리 셋팅
     setStep(2);
   };
 
   const handleFinalConfirm = async () => {
     setIsLoading(true);
     try {
-      const plantInfo = plants[0];
+      const plantInfo = plants.find((p) => p.id === selectedPlant) || plants[0];
 
       // 💡 백엔드 명세서 요구사항 { name, species, age, level }에 정확히 맞춤
       const response = await api.post('/plants', {
@@ -72,21 +75,29 @@ export function PlantSelection() {
       <div className="w-full max-w-md relative">
         <AnimatePresence mode="wait">
 
-          {/* Step 1: 종류 선택 (바질 단일) */}
+          {/* Step 1: 종류 선택 (그리드 레이아웃) */}
           {step === 1 && (
-            <motion.div key="step1" variants={variants} initial="enter" animate="center" exit="exit" className="space-y-8 text-center">
+            <motion.div key="step1" variants={variants} initial="enter" animate="center" exit="exit" className="space-y-6 text-center w-full">
               <div className="space-y-2">
                 <h2 className="text-3xl font-black">무엇을 심을까요?</h2>
-                <p className="text-emerald-700/70 font-medium">현재 바질 재배가 가능합니다</p>
+                <p className="text-emerald-700/70 font-medium">재배할 식물의 종류를 선택해주세요</p>
               </div>
-              <button
-                onClick={() => selectPlant('basil')}
-                className="w-full p-10 rounded-[3rem] bg-white shadow-2xl hover:scale-105 transition-transform border-4 border-transparent hover:border-emerald-500 group"
-              >
-                <span className="text-7xl block mb-4 group-hover:animate-bounce-slow">🌿</span>
-                <span className="text-2xl font-black block">바질 (Basil)</span>
-                <span className="text-sm text-emerald-600 font-bold mt-2 inline-block bg-emerald-50 px-3 py-1 rounded-full">난이도: 쉬움</span>
-              </button>
+              <div className="grid grid-cols-1 gap-4 max-h-[60vh] overflow-y-auto px-2 py-2">
+                {plants.map((plant) => (
+                  <button
+                    key={plant.id}
+                    onClick={() => selectPlant(plant.id)}
+                    className="w-full p-6 rounded-[2rem] bg-white shadow-xl hover:scale-[1.02] transition-transform border-4 border-transparent hover:border-emerald-500 flex items-center gap-6 group text-left"
+                  >
+                    <span className="text-5xl group-hover:animate-bounce-slow">{plant.emoji}</span>
+                    <div>
+                      <span className="text-xl font-black block text-slate-800">{plant.nameKo}</span>
+                      <span className="text-xs text-slate-400 font-semibold block mt-0.5">{plant.name}</span>
+                      <span className="text-[10px] text-emerald-600 font-extrabold mt-1.5 inline-block bg-emerald-50 px-2.5 py-0.5 rounded-full">난이도: {plant.difficulty}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </motion.div>
           )}
 
@@ -150,7 +161,7 @@ export function PlantSelection() {
                 <h2 className="text-2xl font-bold leading-tight">7~10일 정도 지나면<br />예쁜 새싹이 자라나요!</h2>
               </div>
               <Button onClick={handleFinalConfirm} disabled={isLoading} className="w-full h-16 rounded-3xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xl shadow-xl">
-                {isLoading ? '연결 중...' : '바질 키우기 시작 ✨'}
+                {isLoading ? '연결 중...' : `${plants.find(p => p.id === selectedPlant)?.nameKo || '식물'} 키우기 시작 ✨`}
               </Button>
             </motion.div>
           )}

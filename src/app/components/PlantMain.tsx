@@ -15,9 +15,11 @@ export function PlantMain() {
     const [isGlobalError, setIsGlobalError] = useState(false);
 
     return (
-        <div className="h-screen w-full overflow-y-auto overflow-x-hidden bg-gradient-to-br from-green-50 via-emerald-50 to-teal-100 
-        p-4 md:p-8 pb-[calc(10rem+env(safe-area-inset-bottom))] 
-        relative">
+        <div className={`h-screen w-full overflow-x-hidden bg-gradient-to-br from-green-50 via-emerald-50 to-teal-100 relative ${
+            activeTab === 'status' || activeTab === 'stats'
+                ? 'overflow-hidden p-0 md:p-0' 
+                : 'overflow-y-auto p-4 md:p-8 pb-[calc(10rem+env(safe-area-inset-bottom))]'
+        }`}>
             {/* ✅ 어느 페이지에 있든 상단에 고정되는 공통 에러 바 */}
             {isGlobalError && (
                 <motion.div

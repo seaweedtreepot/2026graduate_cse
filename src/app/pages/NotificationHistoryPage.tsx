@@ -194,7 +194,7 @@ export function NotificationHistoryPage() {
   }, {});
 
   return (
-    <div className="min-h-[100dvh] w-full bg-gradient-to-br from-green-50 via-emerald-50 to-teal-100 relative overflow-y-auto">
+    <div className="min-h-[100dvh] w-full bg-gradient-to-br from-green-50 via-emerald-50 to-teal-100 relative overflow-y-auto overflow-x-hidden">
       {/* 배경 장식 */}
       <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-green-200/20 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[-10%] w-96 h-96 bg-emerald-200/20 rounded-full blur-3xl pointer-events-none" />
