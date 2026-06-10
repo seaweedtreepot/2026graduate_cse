@@ -6,7 +6,6 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
   define: {
-    global: 'window',
     process: {
       env: {}
     }
@@ -42,7 +41,7 @@ export default defineConfig({
     allowedHosts: true,
     proxy: {
       '/api': {
-        target: 'http://52.72.136.95:8080',
+        target: 'http://52.91.43.152:8080',
         changeOrigin: true,
         secure: false,
       },
