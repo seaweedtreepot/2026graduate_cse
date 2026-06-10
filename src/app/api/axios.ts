@@ -3,7 +3,7 @@ import { getAccessToken, getRefreshToken, updateTokens, clearTokens } from '../u
 
 const BASE_URL = typeof window !== 'undefined' && (window.location.protocol === 'https:' || window.location.hostname.includes('gimdonghyeon.xyz'))
     ? '/api/v1'
-    : 'http://54.211.120.247:8080/api/v1';
+    : 'http://52.72.136.95:8080/api/v1';
 
 // 1️⃣ 토큰이 필요 없는 공개 API 전용 인스턴스 (로그인, 회원가입, 비번찾기)
 export const publicApi = axios.create({
@@ -70,12 +70,12 @@ api.interceptors.response.use(
         const isNetworkError = !error.response || error.code === 'ERR_NETWORK' || error.message === 'Network Error';
 
         // 1. 일시적인 네트워크 오류 또는 게이트웨이 오류(502/503/504) 시 안전한 GET 요청에 대해 최대 3회 재시도(Retry)
-        if (originalRequest && originalRequest.method?.toLowerCase() === 'get' && 
+        if (originalRequest && originalRequest.method?.toLowerCase() === 'get' &&
             (isNetworkError || status === 502 || status === 503 || status === 504)) {
-            
+
             const req = originalRequest as any;
             req._retryCount = req._retryCount || 0;
-            
+
             if (req._retryCount < 3) {
                 req._retryCount += 1;
                 const delay = req._retryCount * 1000; // 1초, 2초, 3초 지연
@@ -136,7 +136,7 @@ api.interceptors.response.use(
                 isRefreshing = false;
 
                 const refreshStatus = refreshError.response?.status;
-                const isRefreshNetworkError = refreshError.message !== 'REFRESH_TOKEN_MISSING' && 
+                const isRefreshNetworkError = refreshError.message !== 'REFRESH_TOKEN_MISSING' &&
                     (!refreshError.response || refreshError.code === 'ERR_NETWORK' || refreshError.message === 'Network Error');
 
                 // 토큰 재발급 도중 발생한 일시적인 네트워크/게이트웨이 에러는 강제 로그아웃시키지 않습니다.

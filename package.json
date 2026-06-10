@@ -8,6 +8,8 @@
     "dev": "vite --host"
   },
   "dependencies": {
+    "@aws-sdk/client-kinesis-video": "^3.1065.0",
+    "@aws-sdk/client-kinesis-video-signaling": "^3.1065.0",
     "@capacitor/cli": "^8.3.3",
     "@capacitor/core": "^8.3.3",
     "@capacitor/push-notifications": "^8.1.1",
@@ -43,6 +45,7 @@
     "@radix-ui/react-toggle": "1.1.2",
     "@radix-ui/react-toggle-group": "1.1.2",
     "@radix-ui/react-tooltip": "1.1.8",
+    "amazon-kinesis-video-streams-webrtc": "^2.8.0",
     "axios": "^1.15.0",
     "canvas-confetti": "1.9.4",
     "class-variance-authority": "0.7.1",
@@ -50,6 +53,7 @@
     "cmdk": "1.1.1",
     "date-fns": "3.6.0",
     "embla-carousel-react": "8.6.0",
+    "events": "^3.3.0",
     "firebase": "^12.13.0",
     "input-otp": "1.4.2",
     "lucide-react": "0.487.0",

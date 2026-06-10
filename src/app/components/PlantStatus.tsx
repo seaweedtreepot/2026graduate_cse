@@ -9,6 +9,7 @@ import { ImageWithFallback } from './figma/ImageWithFallback';
 import { motion, useMotionValue, useSpring } from 'motion/react';
 import api from '../api/axios';
 import { PlantChatbot } from './PlantChatbot';
+import { KVSVideoPlayer } from './KVSVideoPlayer';
 
 
 interface StatusIndicator {
@@ -37,6 +38,17 @@ export function StatusView({ setError }: StatusViewProps) {
   const [showCamera, setShowCamera] = useState(false);
   const [selectedAction, setSelectedAction] = useState<string | null>(null);
   const [streamUrl, setStreamUrl] = useState<string>(''); // 스트리밍 주소 저장
+  const [streamConfig, setStreamConfig] = useState<{
+    channelName: string;
+    region: string;
+    viewerTokenPath: string;
+    initialCredentials: {
+      accessKeyId: string;
+      secretAccessKey: string;
+      sessionToken: string;
+      expiration?: string;
+    };
+  } | null>(null);
   const [isCapturing, setIsCapturing] = useState(false); // 캡처 로딩 상태
   const [streamError, setStreamError] = useState(false); // 스트리밍 연결 에러 여부
   const [fallbackLoaded, setFallbackLoaded] = useState(false); // 대체 이미지 로드 완료 여부
@@ -52,10 +64,27 @@ export function StatusView({ setError }: StatusViewProps) {
   const [tempThreshold, setTempThreshold] = useState(30); // 모달 내 임시 설정값
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
+  const [messageIndex, setMessageIndex] = useState(0);
+
+  const LOADING_MESSAGES = [
+    '정원에서 센서 데이터를 동기화하고 있어요...',
+    '오늘 식물의 기분을 물어보는 중...',
+    '빛과 바람의 기록을 읽어오는 중...',
+    '실시간 정원 상태를 분석하고 있습니다...',
+    '생장 데이터를 불러오고 있어요...'
+  ];
 
   useEffect(() => {
     setIsTouchDevice(window.matchMedia('(pointer: coarse)').matches);
   }, []);
+
+  useEffect(() => {
+    if (!isInitialLoading) return;
+    const interval = setInterval(() => {
+      setMessageIndex((prev) => (prev + 1) % LOADING_MESSAGES.length);
+    }, 1500);
+    return () => clearInterval(interval);
+  }, [isInitialLoading]);
 
   // [추가] 실시간 센서 데이터를 담을 상태 변수입니다.
   const [statusData, setStatusData] = useState<StatusIndicator[]>([
@@ -223,19 +252,71 @@ export function StatusView({ setError }: StatusViewProps) {
     setStreamError(false);
     setFallbackLoaded(false);
     setFallbackSrc('/assets/my_plant.jpg');
+    
+    let isMounted = true;
+
     if (showCamera && plantId) {
-      const fetchStreamUrl = async () => {
+      const startLiveStream = async () => {
         try {
-          const res = await api.get(`/plants/${plantId}/cam/stream-url`);
-          setStreamUrl(res.data.streamUrl);
+          // 🟢 라이브 송출 시작 API 호출
+          const res = await api.post(`/plants/${plantId}/cam/live/start`);
+          if (!isMounted) return;
+
+          if (res.data.status === 'success' && res.data.viewer) {
+            const viewer = res.data.viewer;
+            setStreamConfig({
+              channelName: viewer.channelName,
+              region: viewer.region || 'us-east-1',
+              viewerTokenPath: `/api/v1/plants/${plantId}/cam/viewer-token`,
+              initialCredentials: {
+                accessKeyId: viewer.accessKeyId,
+                secretAccessKey: viewer.secretAccessKey,
+                sessionToken: viewer.sessionToken,
+                expiration: viewer.expiration
+              }
+            });
+            setStreamUrl('');
+          } else {
+            // 구형 호환용 fallback 처리 (API 응답 구조에 viewer 정보가 없는 경우)
+            if (res.data.streamUrl) {
+              const url = res.data.streamUrl;
+              if (url.startsWith('rtsp://')) {
+                setStreamError(true);
+              } else {
+                setStreamUrl(url);
+              }
+            } else {
+              setStreamError(true);
+            }
+          }
         } catch (err) {
-          console.error("스트리밍 주소 로드 실패:", err);
+          console.error("라이브 송출 시작 실패:", err);
+          if (isMounted) {
+            setStreamError(true);
+          }
         }
       };
-      fetchStreamUrl();
+      startLiveStream();
     } else {
+      // 카메라 닫을 때
+      const stopLiveStream = async () => {
+        try {
+          if (plantId && (streamConfig || streamUrl)) {
+            // 🟢 라이브 송출 중지 API 호출
+            await api.post(`/plants/${plantId}/cam/live/stop`);
+          }
+        } catch (err) {
+          console.error("라이브 송출 중지 실패:", err);
+        }
+      };
+      stopLiveStream();
       setStreamUrl('');
+      setStreamConfig(null);
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, [showCamera, plantId]);
 
   // 실제로는 기기에서 받아온 데이터를 사용
@@ -430,20 +511,22 @@ export function StatusView({ setError }: StatusViewProps) {
     console.log("🚀 물주기 버튼 클릭됨! 현재 plantId는:", plantId);
     if (!plantId) return;
 
-    const nextStatus = isWatering ? "OFF" : "ON";
-
     try {
       const res = await api.post(`/plants/${plantId}/control/water`, {
-        status: nextStatus
+        amount: 50 // 백엔드 DTO(WaterControlRequest) 명세에 맞춰 amount(ml) 전송
       });
 
       if (res.status === 200) {
-        setIsWatering(!isWatering);
+        setIsWatering(true);
         fetchStatus();
+        // 5초 동안 급수 애니메이션을 유지한 뒤 자동으로 완료 처리
+        setTimeout(() => {
+          setIsWatering(false);
+        }, 5000);
       }
     } catch (err) {
       console.error("물주기 제어 실패:", err);
-      alert(`물주기를 ${nextStatus === 'ON' ? '시작하는' : '중단하는'} 데 실패했습니다.`);
+      alert("물주기에 실패했습니다. 기기 상태나 네트워크를 확인해 주세요.");
     }
   };
 
@@ -490,7 +573,7 @@ export function StatusView({ setError }: StatusViewProps) {
       let imageUrlToDownload = '';
 
       // 만약 대체 이미지가 작동 중인 오프라인 상태라면, 로컬 대체 이미지를 바로 다운로드하도록 설정
-      if (fallbackLoaded || streamError || !streamUrl) {
+      if (fallbackLoaded || streamError || (!streamUrl && !streamConfig)) {
         imageUrlToDownload = fallbackSrc;
       } else {
         // 1. 백엔드에 캡처 요청 (서버가 사진을 찍고 클라우드에 올림)
@@ -636,6 +719,73 @@ export function StatusView({ setError }: StatusViewProps) {
   };
   return (
     <div className="h-[100dvh] w-full relative overflow-hidden pb-28 select-none touch-none"> {/* 스크롤을 방지하고 네이티브 앱 대시보드처럼 고정 */}
+      {/* 프리미엄 로딩 스크린 오버레이 */}
+      <AnimatePresence>
+        {isInitialLoading && (
+          <motion.div
+            key="loading"
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4 }}
+            className="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-emerald-950 via-teal-900 to-green-950 z-[9999] text-white p-6"
+          >
+            {/* 은은하게 빛나는 배경 오라 */}
+            <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl animate-pulse" />
+            <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-teal-500/10 rounded-full blur-3xl animate-pulse" />
+
+            <div className="relative flex flex-col items-center max-w-xs text-center space-y-8 z-[10000]">
+              {/* 로더 원형 용기 */}
+              <div className="relative flex items-center justify-center w-32 h-32">
+                {/* 외곽 회전 링 */}
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                  className="absolute inset-0 rounded-full border-2 border-emerald-500/30 border-t-emerald-400"
+                />
+                
+                {/* 내부 맥박 오라 */}
+                <motion.div
+                  animate={{ scale: [1, 1.08, 1] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                  className="w-24 h-24 rounded-full bg-white/5 backdrop-blur-md border border-white/10 flex items-center justify-center shadow-2xl shadow-emerald-950/50"
+                >
+                  {/* 새싹 아이콘 바운스 */}
+                  <motion.span
+                    animate={{ y: [-4, 4, -4] }}
+                    transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                    className="text-4xl filter drop-shadow-[0_0_12px_rgba(16,185,129,0.5)]"
+                  >
+                    🌱
+                  </motion.span>
+                </motion.div>
+              </div>
+
+              {/* 로딩 텍스트 */}
+              <div className="space-y-3">
+                <h3 className="text-xl font-black tracking-tight text-emerald-100 animate-pulse">
+                  식물과 연결 중
+                </h3>
+                {/* 롤링 메시지 */}
+                <div className="h-6 overflow-hidden relative">
+                  <AnimatePresence mode="wait">
+                    <motion.p
+                      key={messageIndex}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.3 }}
+                      className="text-xs text-emerald-300/80 font-semibold"
+                    >
+                      {LOADING_MESSAGES[messageIndex]}
+                    </motion.p>
+                  </AnimatePresence>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* 인터랙티브 배경 (상태에 따라 변화) */}
       <motion.div
         className="fixed inset-0 z-0 w-[110vw] h-[110dvh] -left-[5vw] -top-[5dvh]"
@@ -1192,17 +1342,17 @@ export function StatusView({ setError }: StatusViewProps) {
         <div className="relative flex-1">
           <Button
             onClick={handleWaterToggle}
-            disabled={autoWater.enabled}
+            disabled={autoWater.enabled || isWatering}
             className={`w-full font-bold h-12 rounded-2xl transition-all text-xs md:text-sm relative ${
               isWatering
-                ? 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+                ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
                 : 'bg-sky-500 hover:bg-sky-600 text-white shadow-md'
-            } ${autoWater.enabled ? 'opacity-55 cursor-not-allowed' : ''}`}
+            } ${(autoWater.enabled || isWatering) ? 'opacity-55' : ''}`}
           >
             {isWatering ? (
               <>
                 <div className="size-3.5 border-2 border-slate-400 border-t-slate-600 rounded-full animate-spin mr-1.5" />
-                물주기 중단
+                물주는 중...
               </>
             ) : (
               <>
@@ -1263,7 +1413,19 @@ export function StatusView({ setError }: StatusViewProps) {
 
           <div className="space-y-4">
             <div className="relative aspect-video bg-slate-900 rounded-2xl overflow-hidden shadow-inner flex items-center justify-center">
-              {streamUrl && !streamError ? (
+              {streamConfig ? (
+                <KVSVideoPlayer
+                  plantId={plantId || ''}
+                  channelName={streamConfig.channelName}
+                  region={streamConfig.region}
+                  viewerTokenPath={streamConfig.viewerTokenPath}
+                  initialCredentials={streamConfig.initialCredentials}
+                  onStreamError={(err) => {
+                    console.error("KVS 스트림 에러:", err);
+                    setStreamError(true);
+                  }}
+                />
+              ) : streamUrl && !streamError ? (
                 <img
                   src={streamUrl}
                   alt="실시간 스트림"
@@ -1324,7 +1486,7 @@ export function StatusView({ setError }: StatusViewProps) {
               <Button
                 className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-12 rounded-xl"
                 onClick={handleCapture}
-                disabled={isCapturing || (!streamUrl && !fallbackLoaded)}
+                disabled={isCapturing || (!streamUrl && !streamConfig && !fallbackLoaded)}
               >
                 {isCapturing ? '📸 캡처 중...' : '📸 현재 상태 캡처'}
               </Button>

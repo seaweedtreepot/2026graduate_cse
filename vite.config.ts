@@ -5,6 +5,12 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  define: {
+    global: 'window',
+    process: {
+      env: {}
+    }
+  },
   plugins: [
     react(),
     tailwindcss(),
@@ -36,7 +42,7 @@ export default defineConfig({
     allowedHosts: true,
     proxy: {
       '/api': {
-        target: 'http://54.211.120.247:8080',
+        target: 'http://52.72.136.95:8080',
         changeOrigin: true,
         secure: false,
       },
@@ -45,6 +51,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(new URL('.', import.meta.url).pathname, './src'),
+      'events': 'events',
     },
   },
   assetsInclude: ['**/*.svg', '**/*.csv'],
