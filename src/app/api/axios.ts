@@ -3,7 +3,7 @@ import { getAccessToken, getRefreshToken, updateTokens, clearTokens } from '../u
 
 const BASE_URL = typeof window !== 'undefined' && (window.location.protocol === 'https:' || window.location.hostname.includes('gimdonghyeon.xyz'))
     ? '/api/v1'
-    : 'http://52.91.43.152:8080/api/v1';
+    : 'http://52.90.231.230:8080/api/v1';
 
 // 1️⃣ 토큰이 필요 없는 공개 API 전용 인스턴스 (로그인, 회원가입, 비번찾기)
 export const publicApi = axios.create({

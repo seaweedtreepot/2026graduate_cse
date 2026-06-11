@@ -41,7 +41,7 @@ export default defineConfig({
     allowedHosts: true,
     proxy: {
       '/api': {
-        target: 'http://52.91.43.152:8080',
+        target: 'http://52.90.231.230:8080',
         changeOrigin: true,
         secure: false,
       },

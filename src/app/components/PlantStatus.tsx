@@ -267,7 +267,7 @@ export function StatusView({ setError }: StatusViewProps) {
             setStreamConfig({
               channelName: viewer.channelName,
               region: viewer.region || 'us-east-1',
-              viewerTokenPath: `/api/v1/plants/${plantId}/cam/viewer-token`,
+              viewerTokenPath: `/plants/${plantId}/cam/viewer-token`,
               initialCredentials: {
                 accessKeyId: viewer.accessKeyId,
                 secretAccessKey: viewer.secretAccessKey,
@@ -570,26 +570,51 @@ export function StatusView({ setError }: StatusViewProps) {
     setIsCapturing(true);
 
     try {
-      let imageUrlToDownload = '';
+      let blob: Blob | null = null;
+      const videoElement = document.querySelector('video');
 
-      // 만약 대체 이미지가 작동 중인 오프라인 상태라면, 로컬 대체 이미지를 바로 다운로드하도록 설정
-      if (fallbackLoaded || streamError || (!streamUrl && !streamConfig)) {
-        imageUrlToDownload = fallbackSrc;
-      } else {
-        // 1. 백엔드에 캡처 요청 (서버가 사진을 찍고 클라우드에 올림)
-        const res = await api.post(`/plants/${plantId}/cam/capture`);
-        imageUrlToDownload = res.data.imageUrl; // 서버가 준 이미지 주소 추출
+      // 1. 실시간 스트림 비디오 엘리먼트가 존재하고 활성화 상태라면, 브라우저 로컬 화면에서 즉시 캡처 시도 (CORS 및 API 통신 배제)
+      if (videoElement && !streamError && (streamConfig || streamUrl) && videoElement.readyState >= 2) {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = videoElement.videoWidth || 640;
+          canvas.height = videoElement.videoHeight || 480;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+            blob = await new Promise<Blob | null>((resolve) => {
+              canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.95);
+            });
+            console.log('[Capture] 브라우저 로컬 화면 캡처 성공');
+          }
+        } catch (localErr) {
+          console.warn("로컬 화면 캡처 실패, 서버 API 및 대체 이미지 방식으로 폴백합니다.", localErr);
+        }
       }
 
-      if (!imageUrlToDownload) throw new Error("이미지 주소가 없습니다.");
+      // 2. 로컬 비디오 캡처에 실패했거나 오프라인인 경우 기존 방식으로 폴백
+      if (!blob) {
+        let imageUrlToDownload = '';
+        if (fallbackLoaded || streamError || (!streamUrl && !streamConfig)) {
+          imageUrlToDownload = fallbackSrc;
+        } else {
+          // 백엔드에 캡처 요청 (서버가 사진을 찍고 클라우드에 올림)
+          const res = await api.post(`/plants/${plantId}/cam/capture`);
+          imageUrlToDownload = res.data.imageUrl;
+        }
 
-      // 2. 💡 [핵심] 이미지 URL을 블롭(Blob) 데이터로 변환하여 폰에 다운로드 트리거
-      const imageResponse = await fetch(imageUrlToDownload);
-      const blob = await imageResponse.blob();
+        if (!imageUrlToDownload) throw new Error("이미지 주소가 없습니다.");
+
+        // 이미지 URL을 블롭 데이터로 변환
+        const imageResponse = await fetch(imageUrlToDownload);
+        blob = await imageResponse.blob();
+      }
+
+      if (!blob) throw new Error("이미지 데이터를 생성할 수 없습니다.");
+
       const fileName = `${plantName}_홈캠_${new Date().toISOString().split('T')[0]}.jpg`;
 
-      // 📱 모바일 브라우저(특히 iOS Safari 등)에서 파일 공유 창(Share Sheet)을 띄워
-      // 사용자가 파일 앱을 거치지 않고 곧바로 '이미지 저장(사진첩)'할 수 있도록 지원
+      // 3. 파일 공유(모바일 Share Sheet) 또는 일반 파일 다운로드 트리거
       const file = new File([blob], fileName, { type: blob.type });
       if (isTouchDevice && navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
@@ -598,25 +623,23 @@ export function StatusView({ setError }: StatusViewProps) {
             title: `${plantName} 홈캠 사진`,
             text: '식물 실시간 모니터링 캡처본입니다.'
           });
-          return; // 공유 창 띄우기에 성공하면 기존의 a.download 방식을 실행하지 않고 종료합니다.
+          return;
         } catch (shareErr) {
           if ((shareErr as Error).name !== 'AbortError') {
             console.error("공유 기능 오류, 일반 다운로드로 전환합니다.", shareErr);
           } else {
-            return; // 사용자가 단순히 취소 창을 닫은 경우 함수 종료
+            return; // 사용자가 단순히 취소 창을 닫은 경우 종료
           }
         }
       }
 
-      // 💻 navigator.share를 지원하지 않는 기기/브라우저는 가상의 다운로드 링크 클릭 방식으로 폴백
+      // 💻 일반 PC/비지원 환경용 가상 다운로드 링크 클릭 다운로드
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = downloadUrl;
       link.download = fileName;
       document.body.appendChild(link);
       link.click();
-
-      // 링크 제거 및 메모리 정리
       document.body.removeChild(link);
       window.URL.revokeObjectURL(downloadUrl);
 
@@ -729,56 +752,69 @@ export function StatusView({ setError }: StatusViewProps) {
             transition={{ duration: 0.4 }}
             className="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-emerald-950 via-teal-900 to-green-950 z-[9999] text-white p-6"
           >
-            {/* 은은하게 빛나는 배경 오라 */}
-            <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl animate-pulse" />
-            <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-teal-500/10 rounded-full blur-3xl animate-pulse" />
+            {/* 은은하게 빛나는 배경 오라 (모바일에서는 렌더링하지 않음) */}
+            <div className="hidden md:block absolute top-1/4 left-1/4 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl animate-pulse" />
+            <div className="hidden md:block absolute bottom-1/4 right-1/4 w-80 h-80 bg-teal-500/10 rounded-full blur-3xl animate-pulse" />
 
             <div className="relative flex flex-col items-center max-w-xs text-center space-y-8 z-[10000]">
-              {/* 로더 원형 용기 */}
-              <div className="relative flex items-center justify-center w-32 h-32">
-                {/* 외곽 회전 링 */}
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                  className="absolute inset-0 rounded-full border-2 border-emerald-500/30 border-t-emerald-400"
-                />
-                
-                {/* 내부 맥박 오라 */}
-                <motion.div
-                  animate={{ scale: [1, 1.08, 1] }}
-                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                  className="w-24 h-24 rounded-full bg-white/5 backdrop-blur-md border border-white/10 flex items-center justify-center shadow-2xl shadow-emerald-950/50"
-                >
-                  {/* 새싹 아이콘 바운스 */}
-                  <motion.span
-                    animate={{ y: [-4, 4, -4] }}
-                    transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                    className="text-4xl filter drop-shadow-[0_0_12px_rgba(16,185,129,0.5)]"
-                  >
-                    🌱
-                  </motion.span>
-                </motion.div>
+              {/* 모바일용 경량 로더 (JavaScript 루프 애니메이션 배제) */}
+              <div className="flex md:hidden flex-col items-center gap-6">
+                <div className="relative flex items-center justify-center w-20 h-20">
+                  <div className="w-16 h-16 rounded-full border-[3px] border-emerald-500/20 border-t-emerald-400 animate-spin" />
+                  <span className="absolute text-2xl">🌱</span>
+                </div>
+                <div className="space-y-1.5 text-center">
+                  <h3 className="text-lg font-black text-emerald-100">식물과 연결 중</h3>
+                  <p className="text-xs text-emerald-300/70 font-semibold">데이터를 동기화하고 있습니다...</p>
+                </div>
               </div>
 
-              {/* 로딩 텍스트 */}
-              <div className="space-y-3">
-                <h3 className="text-xl font-black tracking-tight text-emerald-100 animate-pulse">
-                  식물과 연결 중
-                </h3>
-                {/* 롤링 메시지 */}
-                <div className="h-6 overflow-hidden relative">
-                  <AnimatePresence mode="wait">
-                    <motion.p
-                      key={messageIndex}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      transition={{ duration: 0.3 }}
-                      className="text-xs text-emerald-300/80 font-semibold"
+              {/* 데스크톱용 프리미엄 모션 로더 */}
+              <div className="hidden md:flex flex-col items-center space-y-8">
+                <div className="relative flex items-center justify-center w-32 h-32">
+                  {/* 외곽 회전 링 */}
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                    className="absolute inset-0 rounded-full border-2 border-emerald-500/30 border-t-emerald-400"
+                  />
+                  
+                  {/* 내부 맥박 오라 */}
+                  <motion.div
+                    animate={{ scale: [1, 1.08, 1] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                    className="w-24 h-24 rounded-full bg-white/10 backdrop-blur-md border border-white/10 flex items-center justify-center shadow-2xl shadow-emerald-950/50"
+                  >
+                    <motion.span
+                      animate={{ y: [-4, 4, -4] }}
+                      transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                      className="text-4xl"
                     >
-                      {LOADING_MESSAGES[messageIndex]}
-                    </motion.p>
-                  </AnimatePresence>
+                      🌱
+                    </motion.span>
+                  </motion.div>
+                </div>
+
+                {/* 로딩 텍스트 */}
+                <div className="space-y-3">
+                  <h3 className="text-xl font-black tracking-tight text-emerald-100 animate-pulse">
+                    식물과 연결 중
+                  </h3>
+                  {/* 롤링 메시지 */}
+                  <div className="h-6 overflow-hidden relative">
+                    <AnimatePresence mode="wait">
+                      <motion.p
+                        key={messageIndex}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.3 }}
+                        className="text-xs text-emerald-300/80 font-semibold"
+                      >
+                        {LOADING_MESSAGES[messageIndex]}
+                      </motion.p>
+                    </AnimatePresence>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1437,20 +1473,22 @@ export function StatusView({ setError }: StatusViewProps) {
                 />
               ) : (
                 <div className="w-full h-full relative flex flex-col items-center justify-center text-emerald-100 gap-3">
-                  <img
-                    src={fallbackSrc}
-                    alt="식물 대체 이미지"
-                    className="absolute inset-0 w-full h-full object-cover"
-                    onLoad={() => setFallbackLoaded(true)}
-                    onError={(e) => {
-                      if (fallbackSrc === '/assets/my_plant.jpg') {
-                        setFallbackSrc('/assets/my_plant.JPG');
-                      } else {
-                        setFallbackLoaded(false);
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }
-                    }}
-                  />
+                  {streamError && (
+                    <img
+                      src={fallbackSrc}
+                      alt="식물 대체 이미지"
+                      className="absolute inset-0 w-full h-full object-cover"
+                      onLoad={() => setFallbackLoaded(true)}
+                      onError={(e) => {
+                        if (fallbackSrc === '/assets/my_plant.jpg') {
+                          setFallbackSrc('/assets/my_plant.JPG');
+                        } else {
+                          setFallbackLoaded(false);
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }
+                      }}
+                    />
+                  )}
                   {!fallbackLoaded && (
                     <div className="relative z-10 flex flex-col items-center gap-2 bg-black/60 p-4 rounded-2xl text-center backdrop-blur-xs max-w-[80%]">
                       {streamError ? (
